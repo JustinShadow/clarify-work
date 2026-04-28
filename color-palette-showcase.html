@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>「专注流」配色方案 - 工作汇报管理系统</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: #f8fafc;
+      color: #1e293b;
+      line-height: 1.6;
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    /* 标题区域 */
+    .header {
+      text-align: center;
+      margin-bottom: 50px;
+    }
+
+    .header h1 {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: #1e3a5f;
+      margin-bottom: 10px;
+    }
+
+    .header p {
+      font-size: 1.1rem;
+      color: #64748b;
+    }
+
+    /* 板块样式 */
+    .section {
+      background: white;
+      border-radius: 16px;
+      padding: 30px;
+      margin-bottom: 30px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .section-title {
+      font-size: 1.3rem;
+      font-weight: 600;
+      color: #1e293b;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #e2e8f0;
+    }
+
+    /* 色卡网格 */
+    .color-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+    }
+
+    .color-card {
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .color-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+    }
+
+    .color-preview {
+      height: 120px;
+      position: relative;
+    }
+
+    .color-info {
+      padding: 15px;
+      background: white;
+    }
+
+    .color-name {
+      font-weight: 600;
+      font-size: 1rem;
+      color: #1e293b;
+      margin-bottom: 4px;
+    }
+
+    .color-hex {
+      font-family: 'Monaco', 'Consolas', monospace;
+      font-size: 0.9rem;
+      color: #64748b;
+    }
+
+    .color-usage {
+      font-size: 0.8rem;
+      color: #94a3b8;
+      margin-top: 6px;
+    }
+
+    /* 优先级展示 */
+    .priority-row {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .priority-item {
+      flex: 1;
+      min-width: 200px;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      padding: 20px;
+      border-radius: 12px;
+      background: white;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    .priority-dot {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .priority-info h4 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #1e293b;
+      margin-bottom: 2px;
+    }
+
+    .priority-info p {
+      font-size: 0.85rem;
+      color: #64748b;
+    }
+
+    /* 状态展示 */
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+    }
+
+    .status-card {
+      padding: 20px;
+      border-radius: 12px;
+      border-left: 4px solid;
+    }
+
+    .status-card h4 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .status-card p {
+      font-size: 0.85rem;
+      opacity: 0.8;
+    }
+
+    /* 应用场景展示 */
+    .mockup-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+    }
+
+    .mockup-card {
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .mockup-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+
+    .mockup-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+    }
+
+    .mockup-title {
+      font-weight: 600;
+      font-size: 1rem;
+    }
+
+    .mockup-content {
+      font-size: 0.9rem;
+      opacity: 0.9;
+    }
+
+    .task-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      margin-top: 10px;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.5);
+    }
+
+    .task-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    /* 中性色展示 */
+    .neutral-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .neutral-item {
+      padding: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .neutral-item span:first-child {
+      font-weight: 500;
+    }
+
+    .neutral-item span:last-child {
+      font-family: monospace;
+      opacity: 0.7;
+    }
+
+    /* 渐变展示 */
+    .gradient-demo {
+      height: 80px;
+      border-radius: 12px;
+      margin-bottom: 10px;
+    }
+
+    /* 响应式 */
+    @media (max-width: 768px) {
+      .header h1 {
+        font-size: 1.8rem;
+      }
+      .color-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- 标题 -->
+    <div class="header">
+      <h1>「专注流」配色方案</h1>
+      <p>专为工作汇报与任务管理系统设计的视觉系统</p>
+    </div>
+
+    <!-- 主色调 -->
+    <div class="section">
+      <h2 class="section-title">🎨 主色调 Primary Colors</h2>
+      <div class="color-grid">
+        <div class="color-card">
+          <div class="color-preview" style="background: #1e3a5f;"></div>
+          <div class="color-info">
+            <div class="color-name">深海蓝</div>
+            <div class="color-hex">#1E3A5F</div>
+            <div class="color-usage">主导航、Logo、页面标题</div>
+          </div>
+        </div>
+        <div class="color-card">
+          <div class="color-preview" style="background: #3b82f6;"></div>
+          <div class="color-info">
+            <div class="color-name">天际蓝</div>
+            <div class="color-hex">#3B82F6</div>
+            <div class="color-usage">主按钮、链接、选中状态</div>
+          </div>
+        </div>
+        <div class="color-card">
+          <div class="color-preview" style="background: #0ea5e9;"></div>
+          <div class="color-info">
+            <div class="color-name">晴空蓝</div>
+            <div class="color-hex">#0EA5E9</div>
+            <div class="color-usage">次级按钮、信息标签</div>
+          </div>
+        </div>
+        <div class="color-card">
+          <div class="color-preview" style="background: #f59e0b;"></div>
+          <div class="color-info">
+            <div class="color-name">琥珀金</div>
+            <div class="color-hex">#F59E0B</div>
+            <div class="color-usage">次要任务、提醒、高亮</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 功能色 -->
+    <div class="section">
+      <h2 class="section-title">⚡ 功能色 Functional Colors</h2>
+      <div class="color-grid">
+        <div class="color-card">
+          <div class="color-preview" style="background: #10b981;"></div>
+          <div class="color-info">
+            <div class="color-name">森林绿</div>
+            <div class="color-hex">#10B981</div>
+            <div class="color-usage">已完成、成功状态、正向反馈</div>
+          </div>
+        </div>
+        <div class="color-card">
+          <div class="color-preview" style="background: #f97316;"></div>
+          <div class="color-info">
+            <div class="color-name">暖橙</div>
+            <div class="color-hex">#F97316</div>
+            <div class="color-usage">阻塞状态、警告、需要注意</div>
+          </div>
+        </div>
+        <div class="color-card">
+          <div class="color-preview" style="background: #ef4444;"></div>
+          <div class="color-info">
+            <div class="color-name">砖红</div>
+            <div class="color-hex">#EF4444</div>
+            <div class="color-usage">逾期、删除、高优先级</div>
+          </div>
+        </div>
+        <div class="color-card">
+          <div class="color-preview" style="background: #6366f1;"></div>
+          <div class="color-info">
+            <div class="color-name">靛蓝</div>
+            <div class="color-hex">#6366F1</div>
+            <div class="color-usage">提示信息、次要标签</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 优先级设计说明 -->
+    <div class="section" style="background: linear-gradient(135deg, #fef2f2 0%, #fffbeb 50%, #f3f4f6 100%); border: 2px solid #e5e7eb;">
+      <h2 class="section-title">🎯 优先级配色逻辑</h2>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+        <div style="padding: 20px; background: white; border-radius: 12px; border-left: 4px solid #dc2626;">
+          <h4 style="color: #dc2626; margin-bottom: 8px;">🔥 暖色 = 紧急度</h4>
+          <p style="color: #64748b; font-size: 0.9rem;">从红色（最热）到黄色（温暖），暖色调直观传达"需要关注"的程度</p>
+        </div>
+        <div style="padding: 20px; background: white; border-radius: 12px; border-left: 4px solid #eab308;">
+          <h4 style="color: #ca8a04; margin-bottom: 8px;">📊 渐进递减</h4>
+          <p style="color: #64748b; font-size: 0.9rem;">P0→P1→P2 形成从深红→橙→黄的连续色谱，层次分明</p>
+        </div>
+        <div style="padding: 20px; background: white; border-radius: 12px; border-left: 4px solid #9ca3af;">
+          <h4 style="color: #6b7280; margin-bottom: 8px;">⚪ 灰色 = 低关注</h4>
+          <p style="color: #64748b; font-size: 0.9rem;">P3使用灰色，视觉上"退后"，表示可以延后处理</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 优先级配色 -->
+    <div class="section">
+      <h2 class="section-title">🔴 任务优先级 Priority Levels</h2>
+      <!-- 优先级渐变条 -->
+      <div style="height: 40px; border-radius: 8px; margin-bottom: 25px; display: flex; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+        <div style="flex: 1; background: linear-gradient(90deg, #991b1b 0%, #dc2626 100%); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 0.9rem;">P0</div>
+        <div style="flex: 1; background: linear-gradient(90deg, #dc2626 0%, #f97316 100%); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 0.9rem;">P1</div>
+        <div style="flex: 1; background: linear-gradient(90deg, #f97316 0%, #eab308 100%); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 0.9rem;">P2</div>
+        <div style="flex: 1; background: linear-gradient(90deg, #eab308 0%, #6b7280 100%); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 0.9rem;">P3</div>
+      </div>
+      <div class="priority-row">
+        <div class="priority-item">
+          <div class="priority-dot" style="background: #dc2626; box-shadow: 0 0 0 3px rgba(220,38,38,0.25);"></div>
+          <div class="priority-info">
+            <h4 style="color: #dc2626;">P0 - 紧急</h4>
+            <p>最关键任务、逾期事项，需要立即处理</p>
+          </div>
+        </div>
+        <div class="priority-item">
+          <div class="priority-dot" style="background: #f97316; box-shadow: 0 0 0 3px rgba(249,115,22,0.2);"></div>
+          <div class="priority-info">
+            <h4 style="color: #c2410c;">P1 - 高</h4>
+            <p>重要任务、今日截止，应尽快完成</p>
+          </div>
+        </div>
+        <div class="priority-item">
+          <div class="priority-dot" style="background: #eab308; box-shadow: 0 0 0 3px rgba(234,179,8,0.2);"></div>
+          <div class="priority-info">
+            <h4 style="color: #a16207;">P2 - 中</h4>
+            <p>常规任务、正常处理，按计划进行</p>
+          </div>
+        </div>
+        <div class="priority-item">
+          <div class="priority-dot" style="background: #6b7280; box-shadow: 0 0 0 3px rgba(107,114,128,0.2);"></div>
+          <div class="priority-info">
+            <h4 style="color: #4b5563;">P3 - 低</h4>
+            <p>低优先级任务、可延后处理</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 状态配色 -->
+    <div class="section">
+      <h2 class="section-title">📊 任务状态 Status Colors</h2>
+      <div class="status-grid">
+        <div class="status-card" style="background: #f8fafc; border-color: #cbd5e1;">
+          <h4 style="color: #64748b;">⏸️ 待办 Todo</h4>
+          <p style="color: #64748b;">尚未开始的任务，等待处理</p>
+        </div>
+        <div class="status-card" style="background: #eff6ff; border-color: #3b82f6;">
+          <h4 style="color: #1d4ed8;">▶️ 进行中 In Progress</h4>
+          <p style="color: #1d4ed8;">当前正在处理的任务</p>
+        </div>
+        <div class="status-card" style="background: #ecfdf5; border-color: #10b981;">
+          <h4 style="color: #047857;">✅ 已完成 Done</h4>
+          <p style="color: #047857;">已完成的任务，显示进度100%</p>
+        </div>
+        <div class="status-card" style="background: #fff7ed; border-color: #f97316;">
+          <h4 style="color: #c2410c;">🚫 已阻塞 Blocked</h4>
+          <p style="color: #c2410c;">因依赖或其他原因暂时无法推进</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 中性色 -->
+    <div class="section">
+      <h2 class="section-title">⚪ 中性色 Neutral Colors</h2>
+      <div class="neutral-stack">
+        <div class="neutral-item" style="background: #f8fafc; color: #1e293b;">
+          <span>页面背景 Page BG</span>
+          <span>#F8FAFC</span>
+        </div>
+        <div class="neutral-item" style="background: #f1f5f9; color: #1e293b;">
+          <span>卡片背景 Card BG</span>
+          <span>#F1F5F9</span>
+        </div>
+        <div class="neutral-item" style="background: #e2e8f0; color: #1e293b;">
+          <span>边框颜色 Border</span>
+          <span>#E2E8F0</span>
+        </div>
+        <div class="neutral-item" style="background: #cbd5e1; color: #1e293b;">
+          <span>分割线 Divider</span>
+          <span>#CBD5E1</span>
+        </div>
+        <div class="neutral-item" style="background: #94a3b8; color: white;">
+          <span>次要文字 Secondary</span>
+          <span>#94A3B8</span>
+        </div>
+        <div class="neutral-item" style="background: #64748b; color: white;">
+          <span>主要文字 Primary Text</span>
+          <span>#64748B</span>
+        </div>
+        <div class="neutral-item" style="background: #1e293b; color: white;">
+          <span>标题文字 Heading</span>
+          <span>#1E293B</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 应用场景 -->
+    <div class="section">
+      <h2 class="section-title">🖼️ 应用场景示意 Usage Examples</h2>
+      <div class="mockup-grid">
+        <!-- 主要任务看板 -->
+        <div class="mockup-card" style="background: linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%); border: 2px solid #3b82f6;">
+          <div class="mockup-header">
+            <div class="mockup-icon" style="background: #3b82f6; color: white;">🎯</div>
+            <div class="mockup-title" style="color: #1e40af;">主要任务看板</div>
+          </div>
+          <div class="mockup-content" style="color: #3b82f6;">
+            用于展示核心工作任务，蓝色系传达专业与专注
+          </div>
+          <div class="task-item">
+            <div class="task-dot" style="background: #dc2626;"></div>
+            <span style="color: #1e293b; font-size: 0.9rem;">完成项目报告 <span style="color: #dc2626; font-size: 0.75rem;">P0紧急</span></span>
+          </div>
+          <div class="task-item">
+            <div class="task-dot" style="background: #eab308;"></div>
+            <span style="color: #1e293b; font-size: 0.9rem;">代码审查 <span style="color: #ca8a04; font-size: 0.75rem;">P2中等</span></span>
+          </div>
+        </div>
+
+        <!-- 次要任务看板 -->
+        <div class="mockup-card" style="background: linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%); border: 2px solid #f59e0b;">
+          <div class="mockup-header">
+            <div class="mockup-icon" style="background: #f59e0b; color: white;">🔧</div>
+            <div class="mockup-title" style="color: #92400e;">次要任务看板</div>
+          </div>
+          <div class="mockup-content" style="color: #d97706;">
+            用于展示日常事务，琥珀色温和不刺眼
+          </div>
+          <div class="task-item">
+            <div class="task-dot" style="background: #9ca3af;"></div>
+            <span style="color: #1e293b; font-size: 0.9rem;">整理文档 <span style="color: #6b7280; font-size: 0.75rem;">P3低</span></span>
+          </div>
+          <div class="task-item">
+            <div class="task-dot" style="background: #ea580c;"></div>
+            <span style="color: #1e293b; font-size: 0.9rem;">回复邮件 <span style="color: #ea580c; font-size: 0.75rem;">P1高</span></span>
+          </div>
+        </div>
+
+        <!-- 逾期提醒 -->
+        <div class="mockup-card" style="background: linear-gradient(135deg, #fee2e2 0%, #fef2f2 100%); border: 2px solid #ef4444;">
+          <div class="mockup-header">
+            <div class="mockup-icon" style="background: #ef4444; color: white;">⚠️</div>
+            <div class="mockup-title" style="color: #b91c1c;">逾期提醒</div>
+          </div>
+          <div class="mockup-content" style="color: #dc2626;">
+            醒目红色提醒用户注意逾期任务
+          </div>
+          <div class="task-item" style="background: rgba(239,68,68,0.1);">
+            <span style="color: #dc2626; font-size: 0.85rem; font-weight: 600;">⚠️ 已逾期 2 天</span>
+          </div>
+        </div>
+
+        <!-- 完成状态 -->
+        <div class="mockup-card" style="background: linear-gradient(135deg, #d1fae5 0%, #ecfdf5 100%); border: 2px solid #10b981;">
+          <div class="mockup-header">
+            <div class="mockup-icon" style="background: #10b981; color: white;">✓</div>
+            <div class="mockup-title" style="color: #047857;">完成状态</div>
+          </div>
+          <div class="mockup-content" style="color: #059669;">
+            绿色传达成就感，鼓励用户持续进步
+          </div>
+          <div class="task-item">
+            <span style="color: #10b981; font-size: 0.9rem; text-decoration: line-through;">✓ 已完成的任务</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 渐变示例 -->
+    <div class="section">
+      <h2 class="section-title">🌈 渐变组合 Gradient Combinations</h2>
+      <div class="color-grid">
+        <div>
+          <div class="gradient-demo" style="background: linear-gradient(135deg, #1e3a5f 0%, #3b82f6 100%);"></div>
+          <div class="color-name" style="text-align: center;">深海到天际</div>
+          <div class="color-usage" style="text-align: center;">Header、Hero区域</div>
+        </div>
+        <div>
+          <div class="gradient-demo" style="background: linear-gradient(135deg, #3b82f6 0%, #0ea5e9 100%);"></div>
+          <div class="color-name" style="text-align: center;">双蓝渐变</div>
+          <div class="color-usage" style="text-align: center;">按钮、卡片背景</div>
+        </div>
+        <div>
+          <div class="gradient-demo" style="background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);"></div>
+          <div class="color-name" style="text-align: center;">金橙暖阳</div>
+          <div class="color-usage" style="text-align: center;">提醒、促销标签</div>
+        </div>
+        <div>
+          <div class="gradient-demo" style="background: linear-gradient(135deg, #10b981 0%, #0ea5e9 100%);"></div>
+          <div class="color-name" style="text-align: center;">绿蓝清新</div>
+          <div class="color-usage" style="text-align: center;">成功状态、正向反馈</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 配色原则 -->
+    <div class="section" style="background: linear-gradient(135deg, #1e3a5f 0%, #3b82f6 100%); color: white;">
+      <h2 class="section-title" style="color: white; border-color: rgba(255,255,255,0.3);">💡 配色设计原则</h2>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+        <div style="padding: 15px; background: rgba(255,255,255,0.1); border-radius: 8px;">
+          <h4 style="margin-bottom: 8px;">专业感</h4>
+          <p style="opacity: 0.9; font-size: 0.9rem;">深海蓝主调传达信任与专业，适合生产力工具场景</p>
+        </div>
+        <div style="padding: 15px; background: rgba(255,255,255,0.1); border-radius: 8px;">
+          <h4 style="margin-bottom: 8px;">状态清晰</h4>
+          <p style="opacity: 0.9; font-size: 0.9rem;">四种功能色明确区分任务状态，一目了然</p>
+        </div>
+        <div style="padding: 15px; background: rgba(255,255,255,0.1); border-radius: 8px;">
+          <h4 style="margin-bottom: 8px;">舒适使用</h4>
+          <p style="opacity: 0.9; font-size: 0.9rem;">低饱和中性色减少眼部疲劳，适合长时间使用</p>
+        </div>
+        <div style="padding: 15px; background: rgba(255,255,255,0.1); border-radius: 8px;">
+          <h4 style="margin-bottom: 8px;">可访问性</h4>
+          <p style="opacity: 0.9; font-size: 0.9rem;">所有颜色对比度符合 WCAG AA 标准，清晰可读</p>
+        </div>
+      </div>
+    </div>
+
+    <div style="text-align: center; padding: 40px; color: #94a3b8;">
+      <p>「专注流」配色方案 v1.0 | 工作汇报管理系统</p>
+    </div>
+  </div>
+</body>
+</html>

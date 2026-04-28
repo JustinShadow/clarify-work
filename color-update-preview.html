@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>配色更新预览 - 专注流</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: #f8fafc; padding: 40px 20px; font-family: system-ui, sans-serif; }
+    .container { max-width: 1000px; margin: 0 auto; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 class="text-2xl font-bold text-[#1e3a5f] mb-2">✅ 配色方案已更新</h1>
+    <p class="text-slate-500 mb-8">优先级配色现在形成「红→橙→黄→灰」的渐进层次</p>
+
+    <!-- 优先级展示 -->
+    <div class="bg-white rounded-xl p-6 shadow-sm mb-6">
+      <h2 class="text-lg font-semibold text-slate-800 mb-4">🔴 任务优先级</h2>
+      <div class="grid grid-cols-4 gap-4">
+        <div class="text-center">
+          <div class="w-8 h-8 rounded-full bg-red-600 mx-auto mb-2 shadow-[0_0_0_4px_rgba(220,38,38,0.2)]"></div>
+          <div class="text-sm font-medium text-red-700">P0 紧急</div>
+          <div class="text-xs text-slate-400">最关键任务</div>
+        </div>
+        <div class="text-center">
+          <div class="w-8 h-8 rounded-full bg-orange-600 mx-auto mb-2 shadow-[0_0_0_4px_rgba(234,88,12,0.2)]"></div>
+          <div class="text-sm font-medium text-orange-700">P1 高</div>
+          <div class="text-xs text-slate-400">重要任务</div>
+        </div>
+        <div class="text-center">
+          <div class="w-8 h-8 rounded-full bg-amber-500 mx-auto mb-2 shadow-[0_0_0_4px_rgba(234,179,8,0.2)]"></div>
+          <div class="text-sm font-medium text-amber-700">P2 中</div>
+          <div class="text-xs text-slate-400">常规任务</div>
+        </div>
+        <div class="text-center">
+          <div class="w-8 h-8 rounded-full bg-gray-400 mx-auto mb-2 shadow-[0_0_0_4px_rgba(156,163,175,0.2)]"></div>
+          <div class="text-sm font-medium text-gray-600">P3 低</div>
+          <div class="text-xs text-slate-400">可延后</div>
+        </div>
+      </div>
+
+      <!-- 渐进条 -->
+      <div class="h-10 rounded-lg mt-6 overflow-hidden flex">
+        <div class="flex-1 bg-gradient-to-r from-red-800 to-red-600 flex items-center justify-center text-white font-semibold text-sm">P0</div>
+        <div class="flex-1 bg-gradient-to-r from-red-600 to-orange-600 flex items-center justify-center text-white font-semibold text-sm">P1</div>
+        <div class="flex-1 bg-gradient-to-r from-orange-600 to-amber-500 flex items-center justify-center text-white font-semibold text-sm">P2</div>
+        <div class="flex-1 bg-gradient-to-r from-amber-500 to-gray-400 flex items-center justify-center text-white font-semibold text-sm">P3</div>
+      </div>
+    </div>
+
+    <!-- 主色调整 -->
+    <div class="bg-white rounded-xl p-6 shadow-sm mb-6">
+      <h2 class="text-lg font-semibold text-slate-800 mb-4">🎨 主色调更新</h2>
+      <div class="grid grid-cols-2 gap-6">
+        <div>
+          <div class="h-24 rounded-lg bg-[#1e3a5f] mb-2"></div>
+          <div class="text-sm font-medium text-slate-800">深海蓝 (导航/Logo)</div>
+          <div class="text-xs text-slate-400">#1E3A5F</div>
+        </div>
+        <div>
+          <div class="h-24 rounded-lg bg-[#dbeafe] border-2 border-[#3b82f6] mb-2"></div>
+          <div class="text-sm font-medium text-slate-800">主线任务看板</div>
+          <div class="text-xs text-slate-400">淡蓝背景 + 蓝色边框</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 状态色 -->
+    <div class="bg-white rounded-xl p-6 shadow-sm">
+      <h2 class="text-lg font-semibold text-slate-800 mb-4">📊 任务状态</h2>
+      <div class="space-y-3">
+        <div class="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border-l-4 border-slate-300">
+          <div class="w-2 h-2 rounded-full bg-slate-400"></div>
+          <span class="text-slate-600 font-medium">⏸️ 待办</span>
+        </div>
+        <div class="flex items-center gap-3 p-3 bg-blue-50 rounded-lg border-l-4 border-blue-400">
+          <div class="w-2 h-2 rounded-full bg-blue-500"></div>
+          <span class="text-blue-700 font-medium">▶️ 进行中</span>
+        </div>
+        <div class="flex items-center gap-3 p-3 bg-emerald-50 rounded-lg border-l-4 border-emerald-400">
+          <div class="w-2 h-2 rounded-full bg-emerald-500"></div>
+          <span class="text-emerald-700 font-medium">✅ 已完成</span>
+        </div>
+        <div class="flex items-center gap-3 p-3 bg-orange-50 rounded-lg border-l-4 border-orange-400">
+          <div class="w-2 h-2 rounded-full bg-orange-500"></div>
+          <span class="text-orange-700 font-medium">🚫 已阻塞</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-8 p-4 bg-slate-100 rounded-lg text-center text-slate-500 text-sm">
+      刷新前端页面查看更新效果 | 配色方案: 「专注流」v1.0
+    </div>
+  </div>
+</body>
+</html>

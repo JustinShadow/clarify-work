@@ -160,20 +160,27 @@ app.put('/api/tasks/:id', (req, res) => {
   const idx = tasks.findIndex(t => t.id === req.params.id)
   if (idx === -1) return res.status(404).json({ error: 'Task not found' })
   const now = new Date().toISOString()
+  const oldStatus = tasks[idx].status
+  const newStatus = req.body.status
   tasks[idx] = {
     ...tasks[idx],
     ...req.body,
     id: tasks[idx].id,
     createdAt: tasks[idx].createdAt,
     updatedAt: now,
-    completedAt: req.body.status === 'done' && !tasks[idx].completedAt ? now : tasks[idx].completedAt,
+    completedAt: newStatus === 'done' && !tasks[idx].completedAt ? now : tasks[idx].completedAt,
   }
-  if (req.body.status === 'done') {
+  if (newStatus === 'done') {
     tasks[idx].progress = 100
     tasks[idx].blocked = false
     tasks[idx].blockedReason = ''
   }
-  if (req.body.status && req.body.status !== 'done') tasks[idx].completedAt = null
+  if (newStatus && newStatus !== 'done') {
+    tasks[idx].completedAt = null
+    if (oldStatus === 'done' && tasks[idx].progress === 100 && !req.body.progress && req.body.progress !== 0) {
+      tasks[idx].progress = 0
+    }
+  }
   if (req.body.tags && req.body.tags.length > 0) syncTags(req.body.tags)
   writeTasks(tasks)
   res.json(tasks[idx])
@@ -384,6 +391,13 @@ app.post('/api/reports/daily/generate', (req, res) => {
   res.json(report)
 })
 
+app.delete('/api/reports/daily/:date', (req, res) => {
+  const filePath = path.join(REPORTS_DIR, 'daily', `${req.params.date}.json`)
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Report not found' })
+  fs.unlinkSync(filePath)
+  res.json({ success: true })
+})
+
 app.put('/api/reports/daily/:date', (req, res) => {
   const filePath = path.join(REPORTS_DIR, 'daily', `${req.params.date}.json`)
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Report not found' })
@@ -496,6 +510,13 @@ app.get('/api/reports/weekly', (req, res) => {
   const files = fs.readdirSync(dir).filter(f => f.endsWith('.json')).sort().reverse()
   const reports = files.map(f => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf-8')))
   res.json(reports)
+})
+
+app.delete('/api/reports/weekly/:weekStart', (req, res) => {
+  const filePath = path.join(REPORTS_DIR, 'weekly', `${req.params.weekStart}.json`)
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Report not found' })
+  fs.unlinkSync(filePath)
+  res.json({ success: true })
 })
 
 app.post('/api/reports/weekly/generate', (req, res) => {
@@ -615,6 +636,13 @@ app.get('/api/reports/monthly', (req, res) => {
   const files = fs.readdirSync(dir).filter(f => f.endsWith('.json')).sort().reverse()
   const reports = files.map(f => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf-8')))
   res.json(reports)
+})
+
+app.delete('/api/reports/monthly/:month', (req, res) => {
+  const filePath = path.join(REPORTS_DIR, 'monthly', `${req.params.month}.json`)
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Report not found' })
+  fs.unlinkSync(filePath)
+  res.json({ success: true })
 })
 
 app.post('/api/reports/monthly/generate', (req, res) => {
@@ -835,14 +863,28 @@ app.post('/api/llm/generate-morning-plan', async (req, res) => {
 
   const systemPrompt = `你是一位专业的测试团队工作规划助手，基于GTD(任务流管理)框架帮助用户生成晨间工作规划。
 
-你需要根据昨日日报数据和当前任务状态，生成结构化的晨间规划，包含：
-1. 昨日遗留分析（从昨日日报提取未完成、阻塞、明日计划）
-2. 今日Inbox（新增任务）
-3. 今日Next Actions（按优先级排序的执行清单）
-4. 今日Waiting（阻塞项跟进计划）
-5. 今日注意事项
+你需要根据昨日日报数据和当前任务状态，生成结构化的晨间规划，每个章节必须使用Markdown二级标题(##)，格式如下：
 
-输出格式使用Markdown，保持简洁专业。如果有用户额外输入，结合用户输入优化规划。`
+## 1. 昨日遗留分析
+从昨日日报提取未完成、阻塞、明日计划，若无昨日日报则基于当前任务状态识别。
+
+## 2. 今日Inbox
+今日新增任务，若无则说明。
+
+## 3. 今日Next Actions
+按优先级排序的执行清单，使用Markdown表格展示，列为：序号|任务|类型|优先级|预估时长|状态|备注
+
+## 4. 今日Waiting
+阻塞项跟进计划，使用Markdown表格展示。
+
+## 5. 今日注意事项
+关键提醒和风险提示。
+
+严格遵守以下输出规则：
+- 每个章节必须使用## 标题，不要使用# 总标题
+- 不要输出任何寒暄、开场白、总结语（如"好的，根据…"、"以下是…"、"希望对您有帮助"等）
+- 不要输出thinking内容、推理过程或分析说明
+- 仅输出纯Markdown格式的规划内容正文`
 
   res.setHeader('Content-Type', 'text/event-stream')
   res.setHeader('Cache-Control', 'no-cache')
@@ -908,7 +950,13 @@ app.post('/api/llm/generate-daily', async (req, res) => {
 5. 🔍 今日复盘(PDCA-Check) - 偏差分析、改进措施、专注度
 6. 💡 明日计划
 
-如果用户提供了晨间规划，对比计划与实际做偏差分析。输出格式使用Markdown。`
+如果用户提供了晨间规划，对比计划与实际做偏差分析。
+
+严格遵守以下输出规则：
+- 直接输出日报正文，从第1点开始，不要输出"日报"等总标题
+- 不要输出任何寒暄、开场白、总结语（如"好的，根据…"、"以下是…"、"希望对您有帮助"等）
+- 不要输出thinking内容、推理过程或分析说明
+- 仅输出纯Markdown格式的日报内容正文`
 
   res.setHeader('Content-Type', 'text/event-stream')
   res.setHeader('Cache-Control', 'no-cache')
@@ -969,7 +1017,13 @@ app.post('/api/llm/generate-weekly', async (req, res) => {
 4. 🔍 周度复盘(PDCA) - 偏差分析、改进措施
 5. 💡 下周计划
 
-重点关注测试迭代相关工作的成果展现。输出格式使用Markdown。`
+重点关注测试迭代相关工作的成果展现。
+
+严格遵守以下输出规则：
+- 直接输出周报正文，从第1点开始，不要输出"周报"等总标题
+- 不要输出任何寒暄、开场白、总结语（如"好的，根据…"、"以下是…"、"希望对您有帮助"等）
+- 不要输出thinking内容、推理过程或分析说明
+- 仅输出纯Markdown格式的周报内容正文`
 
   res.setHeader('Content-Type', 'text/event-stream')
   res.setHeader('Cache-Control', 'no-cache')
@@ -1029,7 +1083,13 @@ app.post('/api/llm/generate-monthly', async (req, res) => {
 5. 🔍 月度复盘(PDCA) - 亮点/不足/意外发现/改进
 6. 🚀 下月展望
 
-重点向上汇报工作价值，突出成果和影响。输出格式使用Markdown。`
+重点向上汇报工作价值，突出成果和影响。
+
+严格遵守以下输出规则：
+- 直接输出月报正文，从第1点开始，不要输出"月报"等总标题
+- 不要输出任何寒暄、开场白、总结语（如"好的，根据…"、"以下是…"、"希望对您有帮助"等）
+- 不要输出thinking内容、推理过程或分析说明
+- 仅输出纯Markdown格式的月报内容正文`
 
   res.setHeader('Content-Type', 'text/event-stream')
   res.setHeader('Cache-Control', 'no-cache')

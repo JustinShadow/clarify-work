@@ -51,12 +51,14 @@ export const dailyReportApi = {
     improvementMeasures?: string
     llmContent?: string
   }) => request<DailyReport>('/reports/daily/generate', { method: 'POST', body: JSON.stringify(data) }),
+  delete: (date: string) => request<{ success: boolean }>(`/reports/daily/${date}`, { method: 'DELETE' }),
   update: (date: string, data: Partial<DailyReport>) =>
     request<DailyReport>(`/reports/daily/${date}`, { method: 'PUT', body: JSON.stringify(data) }),
 }
 
 export const weeklyReportApi = {
   list: () => request<WeeklyReport[]>('/reports/weekly'),
+  delete: (weekStart: string) => request<{ success: boolean }>(`/reports/weekly/${weekStart}`, { method: 'DELETE' }),
   generate: (data: {
     weekStart: string
     weekEnd: string
@@ -71,6 +73,7 @@ export const weeklyReportApi = {
 
 export const monthlyReportApi = {
   list: () => request<MonthlyReport[]>('/reports/monthly'),
+  delete: (month: string) => request<{ success: boolean }>(`/reports/monthly/${month}`, { method: 'DELETE' }),
   generate: (data: {
     month: string
     summary?: string

@@ -122,17 +122,17 @@ export const PRIORITY_LABELS: Record<TaskPriority, string> = {
 }
 
 export const PRIORITY_COLORS: Record<TaskPriority, string> = {
-  P0: 'bg-red-100 text-red-700 border-red-300',
-  P1: 'bg-orange-100 text-orange-700 border-orange-300',
-  P2: 'bg-blue-100 text-blue-700 border-blue-300',
-  P3: 'bg-gray-100 text-gray-600 border-gray-300',
+  P0: 'bg-[#dc2626] text-white border-[#b91c1c]',
+  P1: 'bg-[#fff7ed] text-[#c2410c] border-[#fdba74]',
+  P2: 'bg-[#fefce8] text-[#a16207] border-[#fde047]',
+  P3: 'bg-[#f3f4f6] text-[#4b5563] border-[#d1d5db]',
 }
 
 export const PRIORITY_DOT: Record<TaskPriority, string> = {
-  P0: 'bg-red-500',
-  P1: 'bg-orange-500',
-  P2: 'bg-blue-500',
-  P3: 'bg-slate-400',
+  P0: 'bg-[#dc2626]',
+  P1: 'bg-[#f97316]',
+  P2: 'bg-[#eab308]',
+  P3: 'bg-[#6b7280]',
 }
 
 export const STATUS_LABELS: Record<TaskStatus, string> = {

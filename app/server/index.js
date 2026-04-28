@@ -19,6 +19,25 @@ const TASKS_FILE = path.join(DATA_DIR, 'tasks.json')
 const TAGS_FILE = path.join(DATA_DIR, 'tags.json')
 const REPORTS_DIR = path.join(DATA_DIR, 'reports')
 const LLM_CONFIG_FILE = path.join(DATA_DIR, 'llm-config.json')
+const MD_REPORTS_ROOT = path.resolve(__dirname, '..', '..', 'reports')
+
+function getMdDir(category, dateOrMonth) {
+  let year, month
+  if (category === 'weekly') {
+    const d = new Date(dateOrMonth)
+    year = d.getFullYear()
+    month = String(d.getMonth() + 1).padStart(2, '0')
+  } else if (category === 'monthly') {
+    year = dateOrMonth.slice(0, 4)
+    month = dateOrMonth.slice(5, 7)
+  } else {
+    year = dateOrMonth.slice(0, 4)
+    month = dateOrMonth.slice(5, 7)
+  }
+  const dir = path.join(MD_REPORTS_ROOT, year, month, category)
+  ensureDir(dir)
+  return dir
+}
 
 function readTasks() {
   if (!fs.existsSync(TASKS_FILE)) return []
@@ -220,9 +239,9 @@ app.post('/api/reports/morning-plan/generate', (req, res) => {
   fs.writeFileSync(path.join(dir, `${date}.json`), JSON.stringify(plan, null, 2), 'utf-8')
 
   const md = generateMorningPlanMarkdown(plan)
-  const mdDir = path.join(process.cwd(), 'reports', 'morning-plan')
+  const mdDir = getMdDir('daily', date)
   ensureDir(mdDir)
-  fs.writeFileSync(path.join(mdDir, `${date}.md`), md, 'utf-8')
+  fs.writeFileSync(path.join(mdDir, `${date}-plan.md`), md, 'utf-8')
 
   res.json(plan)
 })
@@ -236,9 +255,9 @@ app.put('/api/reports/morning-plan/:date', (req, res) => {
   fs.writeFileSync(filePath, JSON.stringify(updated, null, 2), 'utf-8')
 
   const md = generateMorningPlanMarkdown(updated)
-  const mdDir = path.join(process.cwd(), 'reports', 'morning-plan')
+  const mdDir = getMdDir('daily', req.params.date)
   ensureDir(mdDir)
-  fs.writeFileSync(path.join(mdDir, `${req.params.date}.md`), md, 'utf-8')
+  fs.writeFileSync(path.join(mdDir, `${req.params.date}-plan.md`), md, 'utf-8')
 
   res.json(updated)
 })
@@ -349,7 +368,7 @@ app.post('/api/reports/daily/generate', (req, res) => {
   fs.writeFileSync(path.join(dir, `${date}.json`), JSON.stringify(report, null, 2), 'utf-8')
 
   const md = generateDailyMarkdown(report)
-  const mdDir = path.join(process.cwd(), 'reports', 'daily')
+  const mdDir = getMdDir('daily', date)
   ensureDir(mdDir)
   fs.writeFileSync(path.join(mdDir, `${date}.md`), md, 'utf-8')
 
@@ -365,7 +384,7 @@ app.put('/api/reports/daily/:date', (req, res) => {
   fs.writeFileSync(filePath, JSON.stringify(updated, null, 2), 'utf-8')
 
   const md = generateDailyMarkdown(updated)
-  const mdDir = path.join(process.cwd(), 'reports', 'daily')
+  const mdDir = getMdDir('daily', req.params.date)
   ensureDir(mdDir)
   fs.writeFileSync(path.join(mdDir, `${req.params.date}.md`), md, 'utf-8')
 
@@ -513,7 +532,7 @@ app.post('/api/reports/weekly/generate', (req, res) => {
   fs.writeFileSync(path.join(dir, `${weekStart}.json`), JSON.stringify(report, null, 2), 'utf-8')
 
   const md = generateWeeklyMarkdown(report)
-  const mdDir = path.join(process.cwd(), 'reports', 'weekly')
+  const mdDir = getMdDir('weekly', weekStart)
   ensureDir(mdDir)
   fs.writeFileSync(path.join(mdDir, `${weekStart}.md`), md, 'utf-8')
 
@@ -626,7 +645,7 @@ app.post('/api/reports/monthly/generate', (req, res) => {
   fs.writeFileSync(path.join(dir, `${month}.json`), JSON.stringify(report, null, 2), 'utf-8')
 
   const md = generateMonthlyMarkdown(report)
-  const mdDir = path.join(process.cwd(), 'reports', 'monthly')
+  const mdDir = getMdDir('monthly', month)
   ensureDir(mdDir)
   fs.writeFileSync(path.join(mdDir, `${month}.md`), md, 'utf-8')
 

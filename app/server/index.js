@@ -14,22 +14,31 @@ app.use((req, res, next) => {
   next()
 })
 
-const DATA_DIR = path.join(__dirname, 'data')
+const APP_DATA_DIR = path.resolve(__dirname, '..', 'app-data')
+const CONFIG_DIR = path.join(APP_DATA_DIR, 'config')
+const DATA_DIR = path.join(APP_DATA_DIR, 'data')
+const INTERNAL_REPORTS_DIR = path.join(APP_DATA_DIR, 'reports')
 const TASKS_FILE = path.join(DATA_DIR, 'tasks.json')
 const TAGS_FILE = path.join(DATA_DIR, 'tags.json')
-const REPORTS_DIR = path.join(DATA_DIR, 'reports')
-const LLM_CONFIG_FILE = path.join(DATA_DIR, 'llm-config.json')
+const REPORTS_DIR = INTERNAL_REPORTS_DIR
+const LLM_CONFIG_FILE = path.join(CONFIG_DIR, 'llm-config.json')
 const MD_REPORTS_ROOT = path.resolve(__dirname, '..', '..', 'reports')
+
+ensureDir(CONFIG_DIR)
+ensureDir(DATA_DIR)
+ensureDir(REPORTS_DIR)
 
 function getMdDir(category, dateOrMonth) {
   let year, month
+  if (category === 'monthly') {
+    year = dateOrMonth.slice(0, 4)
+    month = dateOrMonth.slice(5, 7)
+    return path.join(MD_REPORTS_ROOT, year, month)
+  }
   if (category === 'weekly') {
     const d = new Date(dateOrMonth)
     year = d.getFullYear()
     month = String(d.getMonth() + 1).padStart(2, '0')
-  } else if (category === 'monthly') {
-    year = dateOrMonth.slice(0, 4)
-    month = dateOrMonth.slice(5, 7)
   } else {
     year = dateOrMonth.slice(0, 4)
     month = dateOrMonth.slice(5, 7)

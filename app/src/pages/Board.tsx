@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { Task } from '../types'
-import { taskApi, statsApi } from '../api'
+import { taskApi, statsApi, llmApi, morningPlanApi } from '../api'
 import { sortTasksByPriority, getTodayDateStr } from '../utils/priority'
 
 import Layout from '../components/Layout'
@@ -8,6 +8,7 @@ import KanbanBoard from '../components/KanbanBoard'
 import TaskModal from '../components/TaskModal'
 import StatsBar from '../components/StatsBar'
 import DailyReportModal from '../components/DailyReportModal'
+import LLMDialog from '../components/LLMDialog'
 
 export default function Board() {
   const [tasks, setTasks] = useState<Task[]>([])
@@ -15,7 +16,8 @@ export default function Board() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [reportModalOpen, setReportModalOpen] = useState(false)
-  const [stats, setStats] = useState<any>(null)
+  const [morningPlanOpen, setMorningPlanOpen] = useState(false)
+  const [stats, setStats] = useState<{ total: number; todo: number; inProgress: number; blocked: number; done: number; totalEstimatedMinutes: number; completedToday: number; overdueCount: number; overdueTasks: Task[]; mainCount: number; sideCount: number } | null>(null)
 
   const fetchTasks = useCallback(async () => {
     try {
@@ -64,13 +66,21 @@ export default function Board() {
     fetchTasks()
   }
 
-  const handleGenerateReport = () => {
-    setReportModalOpen(true)
-  }
-
   const today = getTodayDateStr()
   const mainTasks = tasks.filter(t => t.type === 'main')
   const sideTasks = tasks.filter(t => t.type === 'side')
+
+  const handleMorningPlanGenerated = async (content: string) => {
+    try {
+      await morningPlanApi.generate({ date: today, llmContent: content })
+    } catch (err) {
+      console.error('Failed to save morning plan:', err)
+    }
+    setMorningPlanOpen(false)
+    fetchTasks()
+  }
+
+  const contextSummary = `当前任务: ${tasks.length}个 | 主线${mainTasks.length} | 支线${sideTasks.length} | 阻塞${tasks.filter(t => t.blocked).length}`
 
   return (
     <Layout>
@@ -82,7 +92,13 @@ export default function Board() {
           </div>
           <div className="flex gap-2">
             <button
-              onClick={handleGenerateReport}
+              onClick={() => setMorningPlanOpen(true)}
+              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition text-sm font-medium flex items-center gap-1"
+            >
+              🌅 晨间规划
+            </button>
+            <button
+              onClick={() => setReportModalOpen(true)}
               className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition text-sm font-medium"
             >
               生成日报
@@ -134,6 +150,16 @@ export default function Board() {
         tasks={tasks}
         onClose={() => setReportModalOpen(false)}
         onGenerated={fetchTasks}
+      />
+
+      <LLMDialog
+        open={morningPlanOpen}
+        title="AI 生成晨间规划"
+        systemContext={contextSummary}
+        onGenerate={handleMorningPlanGenerated}
+        onClose={() => setMorningPlanOpen(false)}
+        streamFn={(body, onChunk) => llmApi.streamGenerate('/llm/generate-morning-plan', body, onChunk)}
+        streamBody={{ date: today }}
       />
     </Layout>
   )

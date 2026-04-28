@@ -25,5 +25,8 @@ npm-debug.log*
 .env
 .env.*
 
+# Sensitive data
+app/server/data/llm-config.json
+
 # OS
 Thumbs.db

@@ -20,8 +20,33 @@ export interface Task {
   tags: string[]
 }
 
+export interface MorningPlan {
+  date: string
+  yesterdayCompleted: string[]
+  yesterdayUnfinished: { title: string; type: TaskType; progress: number }[]
+  yesterdayBlockers: string[]
+  yesterdayTomorrowPlan: string[]
+  inbox: string[]
+  nextActions: {
+    title: string
+    type: TaskType
+    priority: TaskPriority
+    estimatedMinutes: number
+    status: TaskStatus
+    progress: number
+    blocked: boolean
+    blockedReason: string
+  }[]
+  waiting: { title: string; reason: string }[]
+  notes: string
+  llmContent: string
+  createdAt: string
+  updatedAt: string
+}
+
 export interface DailyReport {
   date: string
+  inbox: string[]
   completedMain: Task[]
   completedSide: Task[]
   inProgress: Task[]
@@ -29,8 +54,23 @@ export interface DailyReport {
   tomorrowPlan: string[]
   blockers: string[]
   notes: string
+  focusScore: number | null
+  planCompletionRate: number | null
+  actualCompletionRate: number | null
+  deviationAnalysis: string
+  improvementMeasures: string
+  morningPlan: MorningPlan | null
+  llmContent: string
   createdAt: string
   updatedAt: string
+}
+
+export interface StarAchievement {
+  title: string
+  situation: string
+  task: string
+  action: string
+  result: string
 }
 
 export interface WeeklyReport {
@@ -41,6 +81,11 @@ export interface WeeklyReport {
   highlights: string[]
   issues: string[]
   nextWeekPlan: string[]
+  avgFocusScore: string | null
+  deviationAnalysis: string
+  improvementMeasures: string
+  starAchievements: StarAchievement[]
+  llmContent: string
   createdAt: string
   updatedAt: string
 }
@@ -52,8 +97,21 @@ export interface MonthlyReport {
   highlights: string[]
   issues: string[]
   nextMonthPlan: string[]
+  starAchievements: StarAchievement[]
+  deviationAnalysis: string
+  improvementMeasures: string
+  llmContent: string
   createdAt: string
   updatedAt: string
+}
+
+export interface LLMConfig {
+  provider: string
+  apiKey: string
+  baseUrl: string
+  model: string
+  temperature: number
+  maxTokens: number
 }
 
 export const PRIORITY_LABELS: Record<TaskPriority, string> = {

@@ -1,11 +1,13 @@
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, FileText, Calendar, CalendarDays } from 'lucide-react'
+import { LayoutDashboard, Sunrise, FileText, Calendar, CalendarDays, SettingsIcon } from 'lucide-react'
 
 const navItems = [
   { path: '/', label: '看板', icon: LayoutDashboard },
+  { path: '/plan', label: '规划', icon: Sunrise },
   { path: '/daily', label: '日报', icon: FileText },
   { path: '/weekly', label: '周报', icon: Calendar },
   { path: '/monthly', label: '月报', icon: CalendarDays },
+  { path: '/settings', label: '设置', icon: SettingsIcon },
 ]
 
 export default function Layout({ children }: { children: React.ReactNode }) {

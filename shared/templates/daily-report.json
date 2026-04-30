@@ -1,0 +1,56 @@
+{
+  "title": "# 📋 日报 - {{date}}",
+  "subtitle": "> 工作管理框架：GTD（任务流） | STAR（成果记录） | PDCA（复盘改进）",
+  "sections": [
+    {
+      "id": "inbox",
+      "heading": "## 📥 Inbox - 今日新增任务",
+      "type": "table",
+      "columns": ["#", "任务描述", "来源", "优先级"],
+      "emptyRow": ["-", "无", "-", "-"]
+    },
+    {
+      "id": "nextActions",
+      "heading": "## 🎯 Next Actions - 今日执行",
+      "type": "table",
+      "columns": ["#", "任务描述", "所属项目", "预计耗时", "状态"],
+      "emptyRow": ["-", "无", "-", "-", "-"]
+    },
+    {
+      "id": "done",
+      "heading": "## ✅ Done - 今日完成",
+      "type": "table",
+      "columns": ["#", "任务描述", "所属项目", "实际耗时", "成果简述"],
+      "emptyRow": ["-", "无", "-", "-", "-"]
+    },
+    {
+      "id": "waiting",
+      "heading": "## ⏳ Waiting - 阻塞/依赖",
+      "type": "table",
+      "columns": ["#", "阻塞事项", "原因", "需要谁协助", "预计解决时间"],
+      "emptyRow": ["-", "无", "-", "-", "-"]
+    },
+    {
+      "id": "pdca",
+      "heading": "## 🔍 今日复盘 (PDCA-Check)",
+      "type": "pdca",
+      "fields": {
+        "planCompletionRate": "**计划完成率**：{{plan}}/5 → 实际完成率：{{actual}}/5",
+        "deviationAnalysis": "**偏差分析**：",
+        "improvementMeasures": "**改进措施 (PDCA-Act)**：",
+        "focusScore": "**专注度评分** (1-5)：{{score}}"
+      }
+    },
+    {
+      "id": "tomorrowPlan",
+      "heading": "## 💡 明日计划",
+      "type": "list",
+      "emptyItem": "待规划"
+    },
+    {
+      "id": "llmContent",
+      "heading": "## 🤖 AI 辅助内容",
+      "type": "content"
+    }
+  ]
+}

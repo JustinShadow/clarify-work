@@ -1,0 +1,74 @@
+{
+  "title": "# 📈 月报 - {{month}}",
+  "subtitle": "> 向上汇报 | {{month}} 工作总结",
+  "sections": [
+    {
+      "id": "overview",
+      "heading": "## 🎯 月度工作总览",
+      "type": "table",
+      "columns": ["类别", "任务总数", "完成数", "完成率"],
+      "staticRows": [
+        ["测试迭代任务", "-", "-", "-"],
+        ["其他任务", "-", "-", "-"],
+        ["合计", "-", "{{highlightCount}}", "-"]
+      ]
+    },
+    {
+      "id": "iterationWork",
+      "heading": "## 📦 测试迭代工作 (STAR)",
+      "type": "star"
+    },
+    {
+      "id": "otherWork",
+      "heading": "## 🔧 其他专项工作 (STAR)",
+      "type": "star",
+      "defaultTitle": "专项工作"
+    },
+    {
+      "id": "statistics",
+      "heading": "## 📊 月度数据统计",
+      "type": "table",
+      "columns": ["指标", "本月", "上月", "变化趋势"],
+      "staticRows": [
+        ["测试迭代参与数", "-", "-", "→"],
+        ["Bug 发现总数", "-", "-", "→"],
+        ["严重 Bug 数", "-", "-", "→"],
+        ["随机任务数", "-", "-", "→"],
+        ["阻塞解决率", "-", "-", "→"]
+      ]
+    },
+    {
+      "id": "pdca",
+      "heading": "## 🔍 月度复盘 (PDCA)",
+      "subSections": [
+        {
+          "id": "check",
+          "heading": "### Check",
+          "type": "structured-list",
+          "items": [
+            { "label": "亮点", "emptyItem": "待补充" },
+            { "label": "不足", "emptyItem": "待补充" },
+            { "label": "意外发现", "emptyItem": "待补充" }
+          ]
+        },
+        {
+          "id": "act",
+          "heading": "### Act - 下月改进",
+          "type": "list",
+          "emptyItem": "待补充"
+        }
+      ]
+    },
+    {
+      "id": "nextMonthPlan",
+      "heading": "## 🚀 下月展望",
+      "type": "list",
+      "emptyItem": "待规划"
+    },
+    {
+      "id": "llmContent",
+      "heading": "## 🤖 AI 辅助内容",
+      "type": "content"
+    }
+  ]
+}

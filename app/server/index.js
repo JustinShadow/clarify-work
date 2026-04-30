@@ -23,6 +23,16 @@ const TAGS_FILE = path.join(DATA_DIR, 'tags.json')
 const REPORTS_DIR = INTERNAL_REPORTS_DIR
 const LLM_CONFIG_FILE = path.join(CONFIG_DIR, 'llm-config.json')
 const MD_REPORTS_ROOT = path.resolve(__dirname, '..', '..', 'reports')
+const PROMPTS_DIR = path.resolve(__dirname, '..', '..', 'shared', 'prompts')
+const TEMPLATES_DIR = path.resolve(__dirname, '..', '..', 'shared', 'templates')
+
+function loadPrompt(name) {
+  return fs.readFileSync(path.join(PROMPTS_DIR, `${name}.txt`), 'utf-8')
+}
+
+function loadTemplate(name) {
+  return JSON.parse(fs.readFileSync(path.join(TEMPLATES_DIR, `${name}.json`), 'utf-8'))
+}
 
 ensureDir(CONFIG_DIR)
 ensureDir(DATA_DIR)
@@ -77,7 +87,11 @@ function ensureDir(dir) {
 }
 
 function getToday() {
-  return new Date().toISOString().split('T')[0]
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
 function readLLMConfig() {
@@ -94,7 +108,10 @@ function writeLLMConfig(config) {
 function getYesterday(dateStr) {
   const d = new Date(dateStr)
   d.setDate(d.getDate() - 1)
-  return d.toISOString().split('T')[0]
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
 // ========== LLM Service ==========
@@ -279,94 +296,113 @@ app.put('/api/reports/morning-plan/:date', (req, res) => {
 })
 
 function generateMorningPlanMarkdown(plan) {
+  const tpl = loadTemplate('morning-plan')
   const lines = []
-  lines.push(`# 🌅 晨间工作规划 - ${plan.date}`)
+  lines.push(tpl.title.replace('{{date}}', plan.date))
   lines.push('')
-  lines.push('> 基于昨日日报自动生成 + 今日新增输入 | GTD 任务流管理')
+  lines.push(tpl.subtitle)
   lines.push('')
   lines.push('---')
   lines.push('')
-  lines.push('## 📌 昨日遗留（自动从昨日日报提取）')
+
+  const yesterdayUnfinished = plan.yesterdayUnfinished || []
+  const yesterdayBlockers = plan.yesterdayBlockers || []
+
+  const yesterdaySection = tpl.sections.find(s => s.id === 'yesterdayUnfinished')
+  lines.push(yesterdaySection.heading)
   lines.push('')
-  lines.push('### ✅ 昨日完成事项回顾')
-  lines.push('')
-  lines.push('| # | 任务描述 | 所属项目 | 成果简述 |')
-  lines.push('|---|---------|----------|---------|')
-  if (plan.yesterdayCompleted.length > 0) {
-    plan.yesterdayCompleted.forEach((t, i) => lines.push(`| ${i + 1} | ${t} | - | - |`))
-  } else {
-    lines.push('| - | 无 | - | - |')
-  }
-  lines.push('')
-  lines.push('### ⏳ 昨日未完成 → 今日待续')
-  lines.push('')
-  lines.push('| # | 任务描述 | 所属项目 | 昨日进度 | 今日目标 |')
-  lines.push('|---|---------|----------|---------|---------|')
-  if (plan.yesterdayUnfinished.length > 0) {
-    plan.yesterdayUnfinished.forEach((t, i) => lines.push(`| ${i + 1} | ${t.title} | ${t.type === 'main' ? '主线' : '支线'} | ${t.progress}% | 推进完成 |`))
-  } else {
-    lines.push('| - | 无 | - | - | - |')
-  }
-  lines.push('')
-  lines.push('### 🔄 昨日阻塞事项 → 今日跟进')
-  lines.push('')
-  lines.push('| # | 阻塞事项 | 阻塞原因 | 今日是否可推进 |')
-  lines.push('|---|---------|---------|---------------|')
-  if (plan.yesterdayBlockers.length > 0) {
-    plan.yesterdayBlockers.forEach((b, i) => {
-      const reason = typeof b === 'string' ? b : b.reason || '-'
-      const title = typeof b === 'string' ? b : b.title || b
-      lines.push(`| ${i + 1} | ${title} | ${reason} | 待确认 |`)
+  lines.push('| ' + yesterdaySection.columns.join(' | ') + ' |')
+  lines.push('|' + yesterdaySection.columns.map(() => '---').join('|') + '|')
+  if (yesterdayUnfinished.length > 0) {
+    yesterdayUnfinished.forEach((t, i) => {
+      const title = typeof t === 'string' ? t : t.title
+      const progress = typeof t === 'object' && t.progress !== undefined ? t.progress : '-'
+      const priority = (plan.nextActions.find(n => n.title === title) || {}).priority || '-'
+      lines.push(`| ${i + 1} | ${title} | ${priority} | ${progress}% | 推进完成 | 继续执行 |`)
     })
   } else {
-    lines.push('| - | 无 | - | - |')
-  }
-  lines.push('')
-  lines.push('### 💡 昨日报明日计划 → 今日继承')
-  lines.push('')
-  lines.push('| # | 计划事项 | 优先级 |')
-  lines.push('|---|---------|--------|')
-  if (plan.yesterdayTomorrowPlan.length > 0) {
-    plan.yesterdayTomorrowPlan.forEach((p, i) => lines.push(`| ${i + 1} | ${typeof p === 'string' ? p : p.title || p} | - |`))
-  } else {
-    lines.push('| - | 无 | - |')
+    lines.push('| ' + yesterdaySection.emptyRow.join(' | ') + ' |')
   }
   lines.push('')
   lines.push('---')
   lines.push('')
-  lines.push('## 📥 今日新增任务（用户输入）')
+
+  const inboxSection = tpl.sections.find(s => s.id === 'inbox')
+  lines.push(inboxSection.heading)
   lines.push('')
-  lines.push('| # | 任务描述 | 来源 | 优先级 | 预计耗时 |')
-  lines.push('|---|---------|------|--------|---------|')
+  lines.push('| ' + inboxSection.columns.join(' | ') + ' |')
+  lines.push('|' + inboxSection.columns.map(() => '---').join('|') + '|')
   if (plan.inbox.length > 0) {
-    plan.inbox.forEach((t, i) => lines.push(`| ${i + 1} | ${typeof t === 'string' ? t : t.title || t} | - | - | - |`))
+    plan.inbox.forEach((t, i) => lines.push(`| ${i + 1} | ${typeof t === 'string' ? t : t.title || t} | - | - | - | 可直接开始 |`))
   } else {
-    lines.push('| - | 无 | - | - | - |')
+    lines.push('| ' + inboxSection.emptyRow.join(' | ') + ' |')
   }
   lines.push('')
   lines.push('---')
   lines.push('')
-  lines.push('## 🎯 今日工作安排（按优先级排序）')
+
+  const actionable = plan.nextActions.filter(t => !t.blocked)
+  const blocked = plan.nextActions.filter(t => t.blocked)
+
+  const actionsSection = tpl.sections.find(s => s.id === 'nextActions')
+  lines.push(actionsSection.heading)
   lines.push('')
-  lines.push('| # | 任务 | 优先级 | 类型(续/新) | 预计耗时 | 时间段 |')
-  lines.push('|---|------|--------|------------|---------|--------|')
-  plan.nextActions.forEach((t, i) => {
-    const blockedTag = t.blocked ? ' ⛔' : ''
-    const typeLabel = t.type === 'main' ? '主线' : '支线'
-    const isContinue = plan.yesterdayUnfinished.some(y => y.title === t.title) ? '续' : '新'
-    lines.push(`| ${i + 1} | ${t.title}${blockedTag} | ${t.priority} | ${typeLabel}(${isContinue}) | ${t.estimatedMinutes}min | - |`)
+  lines.push('| ' + actionsSection.columns.join(' | ') + ' |')
+  lines.push('|' + actionsSection.columns.map(() => '---').join('|') + '|')
+  actionable.forEach((t, i) => {
+    lines.push(`| ${i + 1} | ${t.title} | ${t.priority} | ${t.progress}% | ${t.estimatedMinutes}min | - | 继续执行 |`)
   })
+  if (actionable.length === 0) {
+    lines.push('| ' + actionsSection.emptyRow.join(' | ') + ' |')
+  }
   lines.push('')
   lines.push('---')
   lines.push('')
-  lines.push('## 📝 今日注意事项')
+
+  const waitingSection = tpl.sections.find(s => s.id === 'waiting')
+  lines.push(waitingSection.heading)
   lines.push('')
-  if (plan.notes) {
-    lines.push(plan.notes)
+  lines.push('| ' + waitingSection.columns.join(' | ') + ' |')
+  lines.push('|' + waitingSection.columns.map(() => '---').join('|') + '|')
+  if (blocked.length > 0) {
+    blocked.forEach((t, i) => {
+      lines.push(`| ${i + 1} | ${t.title} | ${t.blockedReason} | 主动跟进 | 待确认 | 验证测试 |`)
+    })
+  } else if (plan.waiting && plan.waiting.length > 0) {
+    plan.waiting.forEach((t, i) => {
+      lines.push(`| ${i + 1} | ${t.title} | ${t.reason} | 主动跟进 | 待确认 | 验证测试 |`)
+    })
   } else {
-    lines.push('- 无')
+    lines.push('| ' + waitingSection.emptyRow.join(' | ') + ' |')
   }
   lines.push('')
+  lines.push('---')
+  lines.push('')
+
+  const risksSection = tpl.sections.find(s => s.id === 'risks')
+  lines.push(risksSection.heading)
+  lines.push('')
+  lines.push('| ' + risksSection.columns.join(' | ') + ' |')
+  lines.push('|' + risksSection.columns.map(() => '---').join('|') + '|')
+  if (blocked.length > 0) {
+    blocked.forEach((t, i) => {
+      lines.push(`| ${i + 1} | ${t.title}持续阻塞 | 影响进度 | 若持续阻塞则转入其他任务 |`)
+    })
+  } else {
+    lines.push('| ' + risksSection.emptyRow.join(' | ') + ' |')
+  }
+  lines.push('')
+
+  if (plan.llmContent) {
+    const llmSection = tpl.sections.find(s => s.id === 'llmContent')
+    lines.push('---')
+    lines.push('')
+    lines.push(llmSection.heading)
+    lines.push('')
+    lines.push(plan.llmContent)
+    lines.push('')
+  }
+
   return lines.join('\n')
 }
 
@@ -461,32 +497,37 @@ app.put('/api/reports/daily/:date', (req, res) => {
 })
 
 function generateDailyMarkdown(report) {
+  const tpl = loadTemplate('daily-report')
   const lines = []
-  lines.push(`# 📋 日报 - ${report.date}`)
+  lines.push(tpl.title.replace('{{date}}', report.date))
   lines.push('')
-  lines.push('> 工作管理框架：GTD（任务流） | STAR（成果记录） | PDCA（复盘改进）')
+  lines.push(tpl.subtitle)
   lines.push('')
   lines.push('---')
   lines.push('')
-  lines.push('## 📥 Inbox - 今日新增任务')
+
+  const inboxSection = tpl.sections.find(s => s.id === 'inbox')
+  lines.push(inboxSection.heading)
   lines.push('')
-  lines.push('| # | 任务描述 | 来源 | 优先级 |')
-  lines.push('|---|---------|------|--------|')
+  lines.push('| ' + inboxSection.columns.join(' | ') + ' |')
+  lines.push('|' + inboxSection.columns.map(() => '---').join('|') + '|')
   if (report.inbox && report.inbox.length > 0) {
     report.inbox.forEach((t, i) => lines.push(`| ${i + 1} | ${typeof t === 'string' ? t : t} | - | - |`))
   } else {
-    lines.push('| - | 无 | - | - |')
+    lines.push('| ' + inboxSection.emptyRow.join(' | ') + ' |')
   }
   lines.push('')
   lines.push('---')
   lines.push('')
-  lines.push('## 🎯 Next Actions - 今日执行')
+
+  const actionsSection = tpl.sections.find(s => s.id === 'nextActions')
+  lines.push(actionsSection.heading)
   lines.push('')
-  lines.push('| # | 任务描述 | 所属项目 | 预计耗时 | 状态 |')
-  lines.push('|---|---------|----------|---------|------|')
+  lines.push('| ' + actionsSection.columns.join(' | ') + ' |')
+  lines.push('|' + actionsSection.columns.map(() => '---').join('|') + '|')
   const allActive = [...(report.inProgress || []), ...(report.todo || [])]
   if (allActive.length === 0) {
-    lines.push('| - | 无 | - | - | - |')
+    lines.push('| ' + actionsSection.emptyRow.join(' | ') + ' |')
   } else {
     allActive.forEach((t, i) => {
       const blockedTag = t.blocked ? ' ⛔阻塞' : ''
@@ -498,25 +539,29 @@ function generateDailyMarkdown(report) {
   lines.push('')
   lines.push('---')
   lines.push('')
-  lines.push('## ✅ Done - 今日完成')
+
+  const doneSection = tpl.sections.find(s => s.id === 'done')
+  lines.push(doneSection.heading)
   lines.push('')
-  lines.push('| # | 任务描述 | 所属项目 | 实际耗时 | 成果简述 |')
-  lines.push('|---|---------|----------|---------|---------|')
+  lines.push('| ' + doneSection.columns.join(' | ') + ' |')
+  lines.push('|' + doneSection.columns.map(() => '---').join('|') + '|')
   const allDone = [...(report.completedMain || []), ...(report.completedSide || [])]
   if (allDone.length === 0) {
-    lines.push('| - | 无 | - | - | - |')
+    lines.push('| ' + doneSection.emptyRow.join(' | ') + ' |')
   } else {
     allDone.forEach((t, i) => lines.push(`| ${i + 1} | ${t.title} | ${t.type === 'main' ? '主线' : '支线'} | ${t.estimatedMinutes}min | - |`))
   }
   lines.push('')
   lines.push('---')
   lines.push('')
-  lines.push('## ⏳ Waiting - 阻塞/依赖')
+
+  const waitingSection = tpl.sections.find(s => s.id === 'waiting')
+  lines.push(waitingSection.heading)
   lines.push('')
-  lines.push('| # | 阻塞事项 | 原因 | 需要谁协助 | 预计解决时间 |')
-  lines.push('|---|---------|------|-----------|-------------|')
+  lines.push('| ' + waitingSection.columns.join(' | ') + ' |')
+  lines.push('|' + waitingSection.columns.map(() => '---').join('|') + '|')
   if (report.blockers.length === 0) {
-    lines.push('| - | 无 | - | - | - |')
+    lines.push('| ' + waitingSection.emptyRow.join(' | ') + ' |')
   } else {
     report.blockers.forEach((b, i) => {
       const parts = typeof b === 'string' && b.includes('：') ? b.split('：') : [b, '-']
@@ -526,31 +571,38 @@ function generateDailyMarkdown(report) {
   lines.push('')
   lines.push('---')
   lines.push('')
-  lines.push('## 🔍 今日复盘 (PDCA-Check)')
+
+  const pdcaSection = tpl.sections.find(s => s.id === 'pdca')
+  lines.push(pdcaSection.heading)
   lines.push('')
-  lines.push(`**计划完成率**：${report.planCompletionRate ?? '_'}/5 → 实际完成率：${report.actualCompletionRate ?? '_'}/5`)
+  lines.push(pdcaSection.fields.planCompletionRate
+    .replace('{{plan}}', report.planCompletionRate ?? '_')
+    .replace('{{actual}}', report.actualCompletionRate ?? '_'))
   lines.push('')
-  lines.push('**偏差分析**：')
+  lines.push(pdcaSection.fields.deviationAnalysis)
   lines.push(`- ${report.deviationAnalysis || '待补充'}`)
   lines.push('')
-  lines.push('**改进措施 (PDCA-Act)**：')
+  lines.push(pdcaSection.fields.improvementMeasures)
   lines.push(`- ${report.improvementMeasures || '待补充'}`)
   lines.push('')
-  lines.push(`**专注度评分** (1-5)：${report.focusScore ?? '_'}`)
+  lines.push(pdcaSection.fields.focusScore.replace('{{score}}', report.focusScore ?? '_'))
   lines.push('')
   lines.push('---')
   lines.push('')
-  lines.push('## 💡 明日计划')
+
+  const planSection = tpl.sections.find(s => s.id === 'tomorrowPlan')
+  lines.push(planSection.heading)
   if (report.tomorrowPlan.length === 0) {
-    lines.push('- 待规划')
+    lines.push('- ' + planSection.emptyItem)
   } else {
     report.tomorrowPlan.forEach(p => lines.push(`- ${p}`))
   }
   lines.push('')
   if (report.llmContent) {
+    const llmSection = tpl.sections.find(s => s.id === 'llmContent')
     lines.push('---')
     lines.push('')
-    lines.push('## 🤖 AI 辅助内容')
+    lines.push(llmSection.heading)
     lines.push(report.llmContent)
     lines.push('')
   }
@@ -625,30 +677,36 @@ app.post('/api/reports/weekly/generate', (req, res) => {
 })
 
 function generateWeeklyMarkdown(report) {
+  const tpl = loadTemplate('weekly-report')
   const lines = []
-  lines.push(`# 📊 周报 - ${report.weekStart} ~ ${report.weekEnd}`)
+  lines.push(tpl.title.replace('{{weekStart}}', report.weekStart).replace('{{weekEnd}}', report.weekEnd))
   lines.push('')
-  lines.push(`> 基于 ${report.weekStart} ~ ${report.weekEnd} 的日报汇总`)
+  lines.push(tpl.subtitle.replace('{{weekStart}}', report.weekStart).replace('{{weekEnd}}', report.weekEnd))
   lines.push('')
   lines.push('---')
   lines.push('')
-  lines.push('## 📋 本周任务总览')
+
+  const overviewSection = tpl.sections.find(s => s.id === 'overview')
+  lines.push(overviewSection.heading)
   lines.push('')
-  lines.push('| 类别 | 计划任务数 | 完成任务数 | 完成率 |')
-  lines.push('|------|-----------|-----------|--------|')
+  lines.push('| ' + overviewSection.columns.join(' | ') + ' |')
+  lines.push('|' + overviewSection.columns.map(() => '---').join('|') + '|')
   const mainCompleted = (report.highlights || []).length
   const totalIssues = (report.issues || []).length
   const dailyCount = report.dailyReports?.length || 0
-  lines.push(`| 测试任务（迭代） | - | ${mainCompleted} | - |`)
-  lines.push(`| 其他任务（部署/开发等） | - | - | - |`)
-  lines.push(`| 合计 | - | ${mainCompleted} | - |`)
+  overviewSection.staticRows.forEach(row => {
+    lines.push('| ' + row.map(cell => cell.replace('{{mainCompleted}}', mainCompleted)).join(' | ') + ' |')
+  })
   lines.push('')
   lines.push('---')
   lines.push('')
+
+  const starSection = tpl.sections.find(s => s.id === 'starAchievements')
   if (report.starAchievements && report.starAchievements.length > 0) {
-    lines.push('## ✅ 关键成果 (STAR格式)')
+    lines.push(starSection.heading)
     lines.push('')
-    lines.push('### 测试迭代相关工作')
+    const iterSub = starSection.subSections.find(s => s.id === 'iteration')
+    lines.push(iterSub.heading)
     lines.push('')
     report.starAchievements.forEach((s, i) => {
       lines.push(`**成果${i + 1}**：${s.title || ''}`)
@@ -658,19 +716,22 @@ function generateWeeklyMarkdown(report) {
       lines.push(`- **R (结果)**：${s.result || '待补充'}`)
       lines.push('')
     })
-    lines.push('### 其他随机任务')
+    const otherSub = starSection.subSections.find(s => s.id === 'other')
+    lines.push(otherSub.heading)
     lines.push('')
-    lines.push('（待补充）')
+    lines.push(otherSub.placeholder)
     lines.push('')
   }
   lines.push('---')
   lines.push('')
-  lines.push('## ⏳ 阻塞事项跟踪')
+
+  const blockersSection = tpl.sections.find(s => s.id === 'blockers')
+  lines.push(blockersSection.heading)
   lines.push('')
-  lines.push('| 阻塞事项 | 持续天数 | 当前状态 | 下周计划 |')
-  lines.push('|---------|---------|---------|---------|')
+  lines.push('| ' + blockersSection.columns.join(' | ') + ' |')
+  lines.push('|' + blockersSection.columns.map(() => '---').join('|') + '|')
   if (report.issues.length === 0) {
-    lines.push('| 无 | - | - | - |')
+    lines.push('| ' + blockersSection.emptyRow.join(' | ') + ' |')
   } else {
     report.issues.forEach(issue => {
       const parts = typeof issue === 'string' && issue.includes('：') ? issue.split('：') : [issue, '-']
@@ -680,40 +741,54 @@ function generateWeeklyMarkdown(report) {
   lines.push('')
   lines.push('---')
   lines.push('')
-  lines.push('## 🔍 周度复盘 (PDCA)')
+
+  const pdcaSection = tpl.sections.find(s => s.id === 'pdca')
+  lines.push(pdcaSection.heading)
   lines.push('')
-  lines.push('### Check - 偏差分析')
+  const checkSub = pdcaSection.subSections.find(s => s.id === 'check')
+  lines.push(checkSub.heading)
   lines.push('')
-  lines.push('| 维度 | 计划 | 实际 | 偏差原因 |')
-  lines.push('|------|------|------|---------|')
-  lines.push(`| 任务完成率 | - | ${mainCompleted}/${dailyCount} | ${report.deviationAnalysis || '待补充'} |`)
-  lines.push(`| 专注度均值 | - | ${report.avgFocusScore || '-'}/5 | - |`)
-  lines.push(`| 阻塞解决率 | - | ${totalIssues > 0 ? '0' : '-'}/${totalIssues} | - |`)
+  lines.push('| ' + checkSub.columns.join(' | ') + ' |')
+  lines.push('|' + checkSub.columns.map(() => '---').join('|') + '|')
+  checkSub.rows.forEach(row => {
+    lines.push('| ' + row.map(cell =>
+      cell.replace('{{mainCompleted}}', mainCompleted)
+          .replace('{{dailyCount}}', dailyCount)
+          .replace('{{deviationAnalysis}}', report.deviationAnalysis || '待补充')
+          .replace('{{avgFocusScore}}', report.avgFocusScore || '-')
+          .replace('{{resolvedIssues}}', totalIssues > 0 ? '0' : '-')
+          .replace('{{totalIssues}}', totalIssues)
+    ).join(' | ') + ' |')
+  })
   lines.push('')
-  lines.push('### Act - 改进措施')
+  const actSub = pdcaSection.subSections.find(s => s.id === 'act')
+  lines.push(actSub.heading)
   lines.push('')
   if (report.improvementMeasures) {
     lines.push(`- ${report.improvementMeasures}`)
   } else {
-    lines.push('- 待补充')
+    lines.push('- ' + actSub.emptyItem)
   }
   lines.push('')
   lines.push('---')
   lines.push('')
-  lines.push('## 💡 下周计划')
+
+  const planSection = tpl.sections.find(s => s.id === 'nextWeekPlan')
+  lines.push(planSection.heading)
   lines.push('')
-  lines.push('| # | 任务 | 优先级 | 预估耗时 |')
-  lines.push('|---|------|--------|---------|')
+  lines.push('| ' + planSection.columns.join(' | ') + ' |')
+  lines.push('|' + planSection.columns.map(() => '---').join('|') + '|')
   if (report.nextWeekPlan.length === 0) {
-    lines.push('| - | 待规划 | - | - |')
+    lines.push('| ' + planSection.emptyRow.join(' | ') + ' |')
   } else {
     report.nextWeekPlan.forEach((p, i) => lines.push(`| ${i + 1} | ${p} | - | - |`))
   }
   lines.push('')
   if (report.llmContent) {
+    const llmSection = tpl.sections.find(s => s.id === 'llmContent')
     lines.push('---')
     lines.push('')
-    lines.push('## 🤖 AI 辅助内容')
+    lines.push(llmSection.heading)
     lines.push(report.llmContent)
     lines.push('')
   }
@@ -782,26 +857,31 @@ app.post('/api/reports/monthly/generate', (req, res) => {
 })
 
 function generateMonthlyMarkdown(report) {
+  const tpl = loadTemplate('monthly-report')
   const lines = []
-  lines.push(`# 📈 月报 - ${report.month}`)
+  lines.push(tpl.title.replace('{{month}}', report.month))
   lines.push('')
-  lines.push(`> 向上汇报 | ${report.month} 工作总结`)
+  lines.push(tpl.subtitle.replace('{{month}}', report.month))
   lines.push('')
   lines.push('---')
   lines.push('')
-  lines.push('## 🎯 月度工作总览')
+
+  const overviewSection = tpl.sections.find(s => s.id === 'overview')
+  lines.push(overviewSection.heading)
   lines.push('')
-  lines.push('| 类别 | 任务总数 | 完成数 | 完成率 |')
-  lines.push('|------|---------|--------|--------|')
+  lines.push('| ' + overviewSection.columns.join(' | ') + ' |')
+  lines.push('|' + overviewSection.columns.map(() => '---').join('|') + '|')
   const highlightCount = (report.highlights || []).length
-  lines.push('| 测试迭代任务 | - | - | - |')
-  lines.push('| 其他任务 | - | - | - |')
-  lines.push(`| 合计 | - | ${highlightCount} | - |`)
+  overviewSection.staticRows.forEach(row => {
+    lines.push('| ' + row.map(cell => cell.replace('{{highlightCount}}', highlightCount)).join(' | ') + ' |')
+  })
   lines.push('')
   lines.push('---')
   lines.push('')
+
+  const iterSection = tpl.sections.find(s => s.id === 'iterationWork')
   if (report.starAchievements && report.starAchievements.length > 0) {
-    lines.push('## 📦 测试迭代工作 (STAR)')
+    lines.push(iterSection.heading)
     lines.push('')
     report.starAchievements.forEach((s) => {
       lines.push(`### ${s.title || '迭代版本'}`)
@@ -812,9 +892,10 @@ function generateMonthlyMarkdown(report) {
       lines.push('')
     })
   }
-  lines.push('## 🔧 其他专项工作 (STAR)')
+  const otherSection = tpl.sections.find(s => s.id === 'otherWork')
+  lines.push(otherSection.heading)
   lines.push('')
-  lines.push('### 专项工作')
+  lines.push(`### ${otherSection.defaultTitle}`)
   lines.push('**S**：')
   lines.push('**T**：')
   lines.push('**A**：')
@@ -822,54 +903,63 @@ function generateMonthlyMarkdown(report) {
   lines.push('')
   lines.push('---')
   lines.push('')
-  lines.push('## 📊 月度数据统计')
+
+  const statsSection = tpl.sections.find(s => s.id === 'statistics')
+  lines.push(statsSection.heading)
   lines.push('')
-  lines.push('| 指标 | 本月 | 上月 | 变化趋势 |')
-  lines.push('|------|------|------|---------|')
-  lines.push('| 测试迭代参与数 | - | - | → |')
-  lines.push('| Bug 发现总数 | - | - | → |')
-  lines.push('| 严重 Bug 数 | - | - | → |')
-  lines.push('| 随机任务数 | - | - | → |')
-  lines.push('| 阻塞解决率 | - | - | → |')
+  lines.push('| ' + statsSection.columns.join(' | ') + ' |')
+  lines.push('|' + statsSection.columns.map(() => '---').join('|') + '|')
+  statsSection.staticRows.forEach(row => {
+    lines.push('| ' + row.join(' | ') + ' |')
+  })
   lines.push('')
   lines.push('---')
   lines.push('')
-  lines.push('## 🔍 月度复盘 (PDCA)')
+
+  const pdcaSection = tpl.sections.find(s => s.id === 'pdca')
+  lines.push(pdcaSection.heading)
   lines.push('')
-  lines.push('### Check')
+  const checkSub = pdcaSection.subSections.find(s => s.id === 'check')
+  lines.push(checkSub.heading)
   lines.push('')
-  lines.push('- **亮点**：')
-  if (report.highlights.length > 0) {
-    report.highlights.forEach(h => lines.push(`  - ${h}`))
-  } else {
-    lines.push('  - 待补充')
-  }
-  lines.push('- **不足**：')
-  lines.push('  - 待补充')
-  lines.push('- **意外发现**：')
-  lines.push('  - 待补充')
+  checkSub.items.forEach(item => {
+    lines.push(`- **${item.label}**：`)
+    if (item.label === '亮点') {
+      if (report.highlights.length > 0) {
+        report.highlights.forEach(h => lines.push(`  - ${h}`))
+      } else {
+        lines.push(`  - ${item.emptyItem}`)
+      }
+    } else {
+      lines.push(`  - ${item.emptyItem}`)
+    }
+  })
   lines.push('')
-  lines.push('### Act - 下月改进')
+  const actSub = pdcaSection.subSections.find(s => s.id === 'act')
+  lines.push(actSub.heading)
   lines.push('')
   if (report.improvementMeasures) {
     lines.push(`- ${report.improvementMeasures}`)
   } else {
-    lines.push('- 待补充')
+    lines.push('- ' + actSub.emptyItem)
   }
   lines.push('')
   lines.push('---')
   lines.push('')
-  lines.push('## 🚀 下月展望')
+
+  const planSection = tpl.sections.find(s => s.id === 'nextMonthPlan')
+  lines.push(planSection.heading)
   if (report.nextMonthPlan.length === 0) {
-    lines.push('- 待规划')
+    lines.push('- ' + planSection.emptyItem)
   } else {
     report.nextMonthPlan.forEach(p => lines.push(`- ${p}`))
   }
   lines.push('')
   if (report.llmContent) {
+    const llmSection = tpl.sections.find(s => s.id === 'llmContent')
     lines.push('---')
     lines.push('')
-    lines.push('## 🤖 AI 辅助内容')
+    lines.push(llmSection.heading)
     lines.push(report.llmContent)
     lines.push('')
   }
@@ -944,7 +1034,7 @@ app.put('/api/llm/config', (req, res) => {
 
 app.post('/api/llm/test', async (req, res) => {
   try {
-    const result = await callLLM([{ role: 'user', content: '回复"连接成功"' }])
+    const result = await callLLM([{ role: 'user', content: loadPrompt('test') }])
     res.json({ success: true, message: result.trim() })
   } catch (err) {
     res.status(400).json({ success: false, message: err.message })
@@ -972,63 +1062,19 @@ app.post('/api/llm/generate-morning-plan', async (req, res) => {
     yesterdayReport: yesterdayReport ? {
       completedMain: yesterdayReport.completedMain?.map(t => t.title) || [],
       completedSide: yesterdayReport.completedSide?.map(t => t.title) || [],
-      inProgress: yesterdayReport.inProgress?.map(t => `${t.title}(${t.progress}%)`) || [],
+      inProgress: yesterdayReport.inProgress?.map(t => `${t.title}(${t.progress}%${t.type ? ' ' + t.type : ''})`) || [],
       blockers: yesterdayReport.blockers || [],
       tomorrowPlan: yesterdayReport.tomorrowPlan || [],
     } : null,
     currentTasks: {
-      inProgress: inProgress.map(t => `${t.title} [${t.type}] P${t.priority.includes('P') ? t.priority.slice(1) : t.priority} ${t.progress}% ${t.blocked ? '阻塞:' + t.blockedReason : ''}`),
-      todo: todo.map(t => `${t.title} [${t.type}] ${t.priority}`),
-      blocked: blocked.map(t => `${t.title}: ${t.blockedReason}`),
+      inProgress: inProgress.map(t => `${t.title} [${t.type}] ${t.priority} ${t.progress}% 预估${t.estimatedMinutes}min${t.blocked ? ' 阻塞:' + t.blockedReason : ''}`),
+      todo: todo.map(t => `${t.title} [${t.type}] ${t.priority} 预估${t.estimatedMinutes}min`),
+      blocked: blocked.map(t => `${t.title} [${t.type}] ${t.priority} ${t.progress}% 阻塞原因:${t.blockedReason}`),
     },
     userInput: req.body.userInput || '',
   }
 
-  const systemPrompt = `你是一位专业的测试团队工作规划助手，基于GTD(任务流管理)框架帮助用户生成晨间工作规划。
-
-严格按以下模板结构输出，分区名称和表格列定义不得更改：
-
-## 📌 昨日遗留
-
-### ✅ 昨日完成事项回顾
-| # | 任务描述 | 所属项目 | 成果简述 |
-|---|---------|----------|---------|
-（从昨日日报Done区提取，若无昨日日报则填"无"）
-
-### ⏳ 昨日未完成 → 今日待续
-| # | 任务描述 | 所属项目 | 昨日进度 | 今日目标 |
-|---|---------|----------|---------|---------|
-（从昨日日报Next Actions中未完成任务提取，若无则填"无"）
-
-### 🔄 昨日阻塞事项 → 今日跟进
-| # | 阻塞事项 | 阻塞原因 | 今日是否可推进 |
-|---|---------|---------|---------------|
-（从昨日日报Waiting区提取，若无则填"无"）
-
-### 💡 昨日报明日计划 → 今日继承
-| # | 计划事项 | 优先级 |
-|---|---------|--------|
-（从昨日日报明日计划提取，若无则填"无"）
-
-## 📥 今日新增任务
-| # | 任务描述 | 来源 | 优先级 | 预计耗时 |
-|---|---------|------|--------|---------|
-
-## 🎯 今日工作安排（按优先级排序）
-| # | 任务 | 优先级 | 类型(续/新) | 预计耗时 | 时间段 |
-|---|------|--------|------------|---------|--------|
-（合并昨日遗留+今日新增，按优先级排序）
-
-## 📝 今日注意事项
-- 关键提醒和风险提示
-
-严格遵守以下输出规则：
-- 每个分区必须使用## 标题，子分区使用### 标题，不得更改分区名称
-- 所有任务数据必须使用Markdown表格，不得使用列表替代
-- 不要输出任何寒暄、开场白、总结语（如"好的，根据…"、"以下是…"、"希望对您有帮助"等）
-- 不要输出thinking内容、推理过程或分析说明
-- 仅输出纯Markdown格式的规划内容正文
-- 表格必须填写，无数据时填"无"，不得留空`
+  const systemPrompt = loadPrompt('morning-plan')
 
   res.setHeader('Content-Type', 'text/event-stream')
   res.setHeader('Cache-Control', 'no-cache')
@@ -1084,50 +1130,7 @@ app.post('/api/llm/generate-daily', async (req, res) => {
     tomorrowPlan: req.body.tomorrowPlan || [],
   }
 
-  const systemPrompt = `你是一位专业的测试团队工作日报助手，基于GTD+PDCA混合框架帮助用户生成结构化日报。
-
-严格按以下模板结构输出，分区名称和表格列定义不得更改：
-
-## 📥 Inbox - 今日新增任务
-| # | 任务描述 | 来源 | 优先级 |
-|---|---------|------|--------|
-
-## 🎯 Next Actions - 今日执行
-| # | 任务描述 | 所属项目 | 预计耗时 | 状态 |
-|---|---------|----------|---------|------|
-（状态填：进行中/已完成）
-
-## ✅ Done - 今日完成
-| # | 任务描述 | 所属项目 | 实际耗时 | 成果简述 |
-|---|---------|----------|---------|---------|
-
-## ⏳ Waiting - 阻塞/依赖
-| # | 阻塞事项 | 原因 | 需要谁协助 | 预计解决时间 |
-|---|---------|------|-----------|-------------|
-
-## 🔍 今日复盘 (PDCA-Check)
-**计划完成率**：_/5 → 实际完成率：_/5
-
-**偏差分析**：
-- （对照晨间规划，分析计划vs实际的偏差及原因）
-
-**改进措施 (PDCA-Act)**：
-- （基于偏差分析提出具体改进措施）
-
-**专注度评分** (1-5)：__
-
-## 💡 明日计划
-- （列出明日待办事项）
-
-如果用户提供了晨间规划，必须对照计划做偏差分析。PDCA-Check区每个字段都必须填写，不得留空。
-
-严格遵守以下输出规则：
-- 每个分区必须使用## 标题，不得更改分区名称
-- 所有任务数据必须使用Markdown表格，不得使用列表替代
-- PDCA-Check区为必填项，计划完成率、偏差分析、改进措施、专注度评分均不得留空
-- 不要输出任何寒暄、开场白、总结语（如"好的，根据…"、"以下是…"、"希望对您有帮助"等）
-- 不要输出thinking内容、推理过程或分析说明
-- 仅输出纯Markdown格式的日报内容正文`
+  const systemPrompt = loadPrompt('daily-report')
 
   res.setHeader('Content-Type', 'text/event-stream')
   res.setHeader('Cache-Control', 'no-cache')
@@ -1179,65 +1182,7 @@ app.post('/api/llm/generate-weekly', async (req, res) => {
     userInput: req.body.userInput || '',
   }
 
-  const systemPrompt = `你是一位专业的测试团队周报助手，基于PDCA+STAR框架帮助用户生成结构化周报。
-
-严格按以下模板结构输出，分区名称和表格列定义不得更改：
-
-## 📋 本周任务总览
-| 类别 | 计划任务数 | 完成任务数 | 完成率 |
-|------|-----------|-----------|--------|
-| 测试任务（迭代） | | | |
-| 其他任务（部署/开发等） | | | |
-| 合计 | | | |
-
-## ✅ 关键成果 (STAR格式)
-
-### 测试迭代相关工作
-
-**成果1**：{{title}}
-- **S (背景)**：
-- **T (目标)**：
-- **A (行动)**：
-- **R (结果)**：
-
-（每项关键成果必须完整填写STAR四个维度，不得省略任一维度）
-
-### 其他随机任务
-
-**成果X**：{{title}}
-- **S**：
-- **T**：
-- **A**：
-- **R**：
-
-## ⏳ 阻塞事项跟踪
-| 阻塞事项 | 持续天数 | 当前状态 | 下周计划 |
-|---------|---------|---------|---------|
-
-## 🔍 周度复盘 (PDCA)
-
-### Check - 偏差分析
-| 维度 | 计划 | 实际 | 偏差原因 |
-|------|------|------|---------|
-| 任务完成率 | | | |
-| 专注度均值 | | | |
-| 阻塞解决率 | | | |
-
-### Act - 改进措施
--
-
-## 💡 下周计划
-| # | 任务 | 优先级 | 预估耗时 |
-|---|------|--------|---------|
-
-严格遵守以下输出规则：
-- 每个分区必须使用## 标题，子分区使用### 标题，不得更改分区名称
-- 所有统计数据和任务列表必须使用Markdown表格，不得使用列表替代
-- STAR成果必须完整填写四个维度(S/T/A/R)，不得省略
-- PDCA的Check维度必须用表格呈现三个维度的对比
-- 不要输出任何寒暄、开场白、总结语（如"好的，根据…"、"以下是…"、"希望对您有帮助"等）
-- 不要输出thinking内容、推理过程或分析说明
-- 仅输出纯Markdown格式的周报内容正文`
+  const systemPrompt = loadPrompt('weekly-report')
 
   res.setHeader('Content-Type', 'text/event-stream')
   res.setHeader('Cache-Control', 'no-cache')
@@ -1287,74 +1232,7 @@ app.post('/api/llm/generate-monthly', async (req, res) => {
     userInput: req.body.userInput || '',
   }
 
-  const systemPrompt = `你是一位专业的测试团队月报助手，基于STAR框架帮助用户生成面向上级的月度工作汇报。
-
-严格按以下模板结构输出，分区名称和表格列定义不得更改：
-
-## 🎯 月度工作总览
-| 类别 | 任务总数 | 完成数 | 完成率 |
-|------|---------|--------|--------|
-| 测试迭代任务 | | | |
-| 其他任务 | | | |
-| 合计 | | | |
-
-## 📦 测试迭代工作 (STAR)
-
-### {{version/iteration_name}}
-**S (背景)**：{{iteration背景}}
-**T (目标)**：{{iteration目标}}
-**A (行动)**：
-- 测试覆盖 {{X}} 个功能模块
-- 执行 {{X}} 条测试用例
-- 发现 {{X}} 个 Bug（{{严重}}/{{一般}}/{{轻微}}）
-
-**R (结果)**：
-- Bug 修复率：{{X%}}
-- 测试通过率：{{X%}}
-- 版本发布状态：{{已发布/待发布}}
-
-（按迭代版本分组，每个版本完整填写STAR四维度）
-
-## 🔧 其他专项工作 (STAR)
-
-### {{task_name}}
-**S**：
-**T**：
-**A**：
-**R**：
-
-## 📊 月度数据统计
-| 指标 | 本月 | 上月 | 变化趋势 |
-|------|------|------|---------|
-| 测试迭代参与数 | | | ↑/↓/→ |
-| Bug 发现总数 | | | ↑/↓/→ |
-| 严重 Bug 数 | | | ↑/↓/→ |
-| 随机任务数 | | | ↑/↓/→ |
-| 阻塞解决率 | | | ↑/↓/→ |
-
-## 🔍 月度复盘 (PDCA)
-
-### Check
-- **亮点**：
-- **不足**：
-- **意外发现**：
-
-### Act - 下月改进
--
-
-## 🚀 下月展望
--
-
-严格遵守以下输出规则：
-- 每个分区必须使用## 标题，子分区使用### 标题，不得更改分区名称
-- 所有统计数据必须使用Markdown表格，不得使用列表替代
-- 月度数据统计必须包含"变化趋势"列，填↑/↓/→
-- STAR成果按迭代版本分组，每个版本完整填写四个维度
-- PDCA的Check必须包含亮点、不足、意外发现三个维度，不得省略
-- 重点向上汇报工作价值，突出成果和影响
-- 不要输出任何寒暄、开场白、总结语（如"好的，根据…"、"以下是…"、"希望对您有帮助"等）
-- 不要输出thinking内容、推理过程或分析说明
-- 仅输出纯Markdown格式的月报内容正文`
+  const systemPrompt = loadPrompt('monthly-report')
 
   res.setHeader('Content-Type', 'text/event-stream')
   res.setHeader('Cache-Control', 'no-cache')

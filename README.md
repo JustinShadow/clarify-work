@@ -24,32 +24,50 @@
 
 ```
 work-report/
-├── app/                    # Web 版本（React + Vite + Express）
-│   ├── src/                # 前端源码
-│   │   ├── api/            # API 调用封装
-│   │   ├── components/     # 通用组件
-│   │   ├── pages/          # 页面组件
-│   │   ├── types/          # TypeScript 类型定义
-│   │   └── utils/          # 工具函数
-│   ├── server/             # Express 后端服务
-│   └── app-data/           # 运行时数据（已 gitignore）
-├── workflow-app/           # 桌面版（React + Vite + Tauri）
-│   ├── src/                # 前端源码（与 app 同步）
-│   └── src-tauri/          # Tauri/Rust 后端
-├── work-report-generator/  # AI Agent Skill（报告生成工作流）
-│   ├── SKILL.md            # Skill 定义
-│   ├── assets/             # 报告模板
-│   └── references/         # 框架参考文档
-├── reports/                # 生成的 Markdown 报告文件
-├── DESIGN_GUIDELINE.md     # 「专注流」前端设计规范
-└── COLOR_CONSISTENCY.md    # 配色一致性记录
+├── shared/                    # 共享前端源码（真相源）
+│   └── src/
+│       ├── api/               # API 调用层（运行时自动选择适配器）
+│       │   ├── index.ts       # 命名空间 Proxy 导出 + 动态加载
+│       │   ├── types.ts       # API 接口定义
+│       │   ├── web-adapter.ts # HTTP fetch 实现
+│       │   └── tauri-adapter.ts # Tauri invoke 实现
+│       ├── components/        # 通用组件（9个）
+│       ├── pages/             # 页面组件（6个）
+│       ├── types/             # TypeScript 类型定义 + Tauri API stub
+│       ├── utils/             # 工具函数
+│       ├── App.tsx            # 统一路由
+│       └── index.css          # 全局样式
+├── app/                       # Web 版本（React + Vite + Express）
+│   ├── src/main.tsx           # 入口文件
+│   ├── server/                # Express 后端服务
+│   └── app-data/              # 运行时数据（已 gitignore）
+├── workflow-app/              # 桌面版（React + Vite + Tauri）
+│   ├── src/main.tsx           # 入口文件
+│   └── src-tauri/             # Tauri/Rust 后端
+├── work-report-generator/     # AI Agent Skill（报告生成工作流）
+│   ├── SKILL.md               # Skill 定义
+│   ├── assets/                # 报告模板
+│   └── references/            # 框架参考文档
+├── reports/                   # 生成的 Markdown 报告文件
+├── DESIGN_GUIDELINE.md        # 「专注流」前端设计规范
+└── package.json               # 根级依赖（shared node_modules 解析）
 ```
+
+### 架构说明
+
+Web 和桌面应用共享同一套前端源码（`shared/src/`），各应用仅保留 `main.tsx` 入口文件。API 层通过运行时 `isTauri` 检测自动选择适配器：
+
+- **Web**：`web-adapter.ts` → HTTP fetch 到 Express 后端
+- **桌面**：`tauri-adapter.ts` → Tauri invoke 调用 Rust 后端
+
+修改任何页面/组件只需改 `shared/src/` 中一处，两个应用自动生效。
 
 ## 技术栈
 
 | 层级 | Web 版 (app) | 桌面版 (workflow-app) |
 |------|-------------|----------------------|
 | 前端框架 | React 19 + TypeScript | React 19 + TypeScript |
+| 共享源码 | `shared/src/`（Vite alias `@shared`） | 同左 |
 | 构建工具 | Vite 8 | Vite 8 |
 | CSS 方案 | Tailwind CSS 4 | Tailwind CSS 4 |
 | 图标库 | Lucide React | Lucide React |
@@ -59,6 +77,13 @@ work-report/
 | 数据存储 | JSON 文件 | JSON 文件 |
 
 ## 快速开始
+
+### 前置条件
+
+```bash
+# 安装根级依赖（供 shared/src/ 模块解析）
+npm install
+```
 
 ### Web 版
 
@@ -134,6 +159,8 @@ reports/YYYY/MM/
 - 组件规范（按钮、卡片、进度条、弹窗、输入框、标签）
 - 页面布局（导航栏、页面头部、主题色分配）
 - 文字排版、图标规范、响应式设计、动画过渡
+
+配色可视化预览：[color-palette-showcase.html](./color-palette-showcase.html)
 
 ## 数据流转
 

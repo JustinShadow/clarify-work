@@ -5,6 +5,68 @@ use crate::models::*;
 use crate::AppData;
 use crate::commands::tasks;
 
+#[derive(serde::Deserialize)]
+struct ReportTemplate {
+    title: String,
+    subtitle: String,
+    sections: Vec<TemplateSection>,
+}
+
+#[derive(serde::Deserialize)]
+struct TemplateSection {
+    id: String,
+    heading: String,
+    #[serde(default, rename = "type")]
+    section_type: Option<String>,
+    columns: Option<Vec<String>>,
+    empty_row: Option<Vec<String>>,
+    empty_item: Option<String>,
+    static_rows: Option<Vec<Vec<String>>>,
+    rows: Option<Vec<Vec<String>>>,
+    fields: Option<serde_json::Value>,
+    sub_sections: Option<Vec<TemplateSection>>,
+    placeholder: Option<String>,
+    default_title: Option<String>,
+    items: Option<Vec<TemplateListItem>>,
+}
+
+#[derive(serde::Deserialize)]
+struct TemplateListItem {
+    label: String,
+    empty_item: String,
+}
+
+const MORNING_PLAN_TEMPLATE: &str = include_str!("../../../../shared/templates/morning-plan.json");
+const DAILY_REPORT_TEMPLATE: &str = include_str!("../../../../shared/templates/daily-report.json");
+const WEEKLY_REPORT_TEMPLATE: &str = include_str!("../../../../shared/templates/weekly-report.json");
+const MONTHLY_REPORT_TEMPLATE: &str = include_str!("../../../../shared/templates/monthly-report.json");
+
+fn load_template(name: &str) -> ReportTemplate {
+    let content = match name {
+        "morning-plan" => MORNING_PLAN_TEMPLATE,
+        "daily-report" => DAILY_REPORT_TEMPLATE,
+        "weekly-report" => WEEKLY_REPORT_TEMPLATE,
+        "monthly-report" => MONTHLY_REPORT_TEMPLATE,
+        _ => panic!("Unknown template: {}", name),
+    };
+    serde_json::from_str(content).expect(&format!("Failed to parse template: {}", name))
+}
+
+fn find_section<'a>(sections: &'a [TemplateSection], id: &str) -> &'a TemplateSection {
+    sections.iter().find(|s| s.id == id).expect(&format!("Section '{}' not found in template", id))
+}
+
+fn render_table_header(columns: &[String]) -> Vec<String> {
+    let mut lines = vec![];
+    lines.push(format!("| {} |", columns.join(" | ")));
+    lines.push(format!("|{}|", columns.iter().map(|_| "---").collect::<Vec<_>>().join("|")));
+    lines
+}
+
+fn render_empty_row(empty_row: &[String]) -> String {
+    format!("| {} |", empty_row.join(" | "))
+}
+
 pub fn reports_dir(state: &AppData) -> PathBuf {
     state.data_dir.join("reports")
 }
@@ -65,84 +127,59 @@ fn get_md_dir(state: &AppData, category: &str, date_or_month: &str) -> PathBuf {
 // ========== Morning Plan Markdown ==========
 
 fn generate_morning_plan_markdown(plan: &MorningPlan) -> String {
+    let tpl = load_template("morning-plan");
     let mut lines = vec![];
-    lines.push(format!("# 🌅 晨间工作规划 - {}", plan.date));
+    lines.push(tpl.title.replace("{{date}}", &plan.date));
     lines.push(String::new());
-    lines.push("> 基于昨日日报自动生成 + 今日新增输入 | GTD 任务流管理".to_string());
+    lines.push(tpl.subtitle.clone());
     lines.push(String::new());
     lines.push("---".to_string());
     lines.push(String::new());
-    lines.push("## 📌 昨日遗留（自动从昨日日报提取）".to_string());
+
+    let yesterday_section = find_section(&tpl.sections, "yesterdayUnfinished");
+    lines.push(yesterday_section.heading.clone());
     lines.push(String::new());
-    lines.push("### ✅ 昨日完成事项回顾".to_string());
-    lines.push(String::new());
-    lines.push("| # | 任务描述 | 所属项目 | 成果简述 |".to_string());
-    lines.push("|---|---------|----------|---------|".to_string());
+    if let Some(cols) = &yesterday_section.columns {
+        for h in render_table_header(cols) { lines.push(h); }
+    }
     if plan.yesterday_completed.is_empty() {
-        lines.push("| - | 无 | - | - |".to_string());
+        if let Some(empty) = &yesterday_section.empty_row {
+            lines.push(render_empty_row(empty));
+        }
     } else {
         for (i, t) in plan.yesterday_completed.iter().enumerate() {
             lines.push(format!("| {} | {} | - | - |", i + 1, t));
         }
     }
     lines.push(String::new());
-    lines.push("### ⏳ 昨日未完成 → 今日待续".to_string());
-    lines.push(String::new());
-    lines.push("| # | 任务描述 | 所属项目 | 昨日进度 | 今日目标 |".to_string());
-    lines.push("|---|---------|----------|---------|---------|".to_string());
-    if plan.yesterday_unfinished.is_empty() {
-        lines.push("| - | 无 | - | - | - |".to_string());
-    } else {
-        for (i, t) in plan.yesterday_unfinished.iter().enumerate() {
-            let type_label = if t.task_type == "main" { "主线" } else { "支线" };
-            lines.push(format!("| {} | {} | {} | {}% | 推进完成 |", i + 1, t.title, type_label, t.progress));
-        }
-    }
-    lines.push(String::new());
-    lines.push("### 🔄 昨日阻塞事项 → 今日跟进".to_string());
-    lines.push(String::new());
-    lines.push("| # | 阻塞事项 | 阻塞原因 | 今日是否可推进 |".to_string());
-    lines.push("|---|---------|---------|---------------|".to_string());
-    if plan.yesterday_blockers.is_empty() {
-        lines.push("| - | 无 | - | - |".to_string());
-    } else {
-        for (i, b) in plan.yesterday_blockers.iter().enumerate() {
-            lines.push(format!("| {} | {} | - | 待确认 |", i + 1, b));
-        }
-    }
-    lines.push(String::new());
-    lines.push("### 💡 昨日报明日计划 → 今日继承".to_string());
-    lines.push(String::new());
-    lines.push("| # | 计划事项 | 优先级 |".to_string());
-    lines.push("|---|---------|--------|".to_string());
-    if plan.yesterday_tomorrow_plan.is_empty() {
-        lines.push("| - | 无 | - |".to_string());
-    } else {
-        for (i, p) in plan.yesterday_tomorrow_plan.iter().enumerate() {
-            lines.push(format!("| {} | {} | - |", i + 1, p));
-        }
-    }
-    lines.push(String::new());
     lines.push("---".to_string());
     lines.push(String::new());
-    lines.push("## 📥 今日新增任务（用户输入）".to_string());
+
+    let inbox_section = find_section(&tpl.sections, "inbox");
+    lines.push(inbox_section.heading.clone());
     lines.push(String::new());
-    lines.push("| # | 任务描述 | 来源 | 优先级 | 预计耗时 |".to_string());
-    lines.push("|---|---------|------|--------|---------|".to_string());
+    if let Some(cols) = &inbox_section.columns {
+        for h in render_table_header(cols) { lines.push(h); }
+    }
     if plan.inbox.is_empty() {
-        lines.push("| - | 无 | - | - | - |".to_string());
+        if let Some(empty) = &inbox_section.empty_row {
+            lines.push(render_empty_row(empty));
+        }
     } else {
         for (i, t) in plan.inbox.iter().enumerate() {
-            lines.push(format!("| {} | {} | - | - | - |", i + 1, t));
+            lines.push(format!("| {} | {} | - | - | - | 可直接开始 |", i + 1, t));
         }
     }
     lines.push(String::new());
     lines.push("---".to_string());
     lines.push(String::new());
-    lines.push("## 🎯 今日工作安排（按优先级排序）".to_string());
+
+    let actions_section = find_section(&tpl.sections, "nextActions");
+    lines.push(actions_section.heading.clone());
     lines.push(String::new());
-    lines.push("| # | 任务 | 优先级 | 类型(续/新) | 预计耗时 | 时间段 |".to_string());
-    lines.push("|---|------|--------|------------|---------|--------|".to_string());
+    if let Some(cols) = &actions_section.columns {
+        for h in render_table_header(cols) { lines.push(h); }
+    }
     for (i, t) in plan.next_actions.iter().enumerate() {
         let blocked_tag = if t.blocked { " ⛔" } else { "" };
         let type_label = if t.task_type == "main" { "主线" } else { "支线" };
@@ -150,36 +187,83 @@ fn generate_morning_plan_markdown(plan: &MorningPlan) -> String {
         let cont_label = if is_continue { "续" } else { "新" };
         lines.push(format!("| {} | {}{} | {} | {}({}) | {}min | - |", i + 1, t.title, blocked_tag, t.priority, type_label, cont_label, t.estimated_minutes));
     }
+    if plan.next_actions.is_empty() {
+        if let Some(empty) = &actions_section.empty_row {
+            lines.push(render_empty_row(empty));
+        }
+    }
     lines.push(String::new());
     lines.push("---".to_string());
     lines.push(String::new());
-    lines.push("## 📝 今日注意事项".to_string());
+
+    let waiting_section = find_section(&tpl.sections, "waiting");
+    lines.push(waiting_section.heading.clone());
     lines.push(String::new());
-    if plan.notes.is_empty() {
-        lines.push("- 无".to_string());
+    if let Some(cols) = &waiting_section.columns {
+        for h in render_table_header(cols) { lines.push(h); }
+    }
+    if plan.yesterday_blockers.is_empty() {
+        if let Some(empty) = &waiting_section.empty_row {
+            lines.push(render_empty_row(empty));
+        }
     } else {
-        lines.push(plan.notes.clone());
+        for (i, b) in plan.yesterday_blockers.iter().enumerate() {
+            lines.push(format!("| {} | {} | - | 待确认 | 验证测试 |", i + 1, b));
+        }
     }
     lines.push(String::new());
+    lines.push("---".to_string());
+    lines.push(String::new());
+
+    let risks_section = find_section(&tpl.sections, "risks");
+    lines.push(risks_section.heading.clone());
+    lines.push(String::new());
+    if let Some(cols) = &risks_section.columns {
+        for h in render_table_header(cols) { lines.push(h); }
+    }
+    let blocked: Vec<&NextAction> = plan.next_actions.iter().filter(|t| t.blocked).collect();
+    if blocked.is_empty() {
+        if let Some(empty) = &risks_section.empty_row {
+            lines.push(render_empty_row(empty));
+        }
+    } else {
+        for (i, t) in blocked.iter().enumerate() {
+            lines.push(format!("| {} | {}持续阻塞 | 影响进度 | 若持续阻塞则转入其他任务 |", i + 1, t.title));
+        }
+    }
+    lines.push(String::new());
+
+    if !plan.llm_content.is_empty() {
+        let llm_section = find_section(&tpl.sections, "llmContent");
+        lines.push("---".to_string());
+        lines.push(String::new());
+        lines.push(llm_section.heading.clone());
+        lines.push(plan.llm_content.clone());
+        lines.push(String::new());
+    }
     lines.join("\n")
 }
 
 // ========== Daily Report Markdown ==========
 
 fn generate_daily_markdown(report: &DailyReport) -> String {
+    let tpl = load_template("daily-report");
     let mut lines = vec![];
-    lines.push(format!("# 📋 日报 - {}", report.date));
+    lines.push(tpl.title.replace("{{date}}", &report.date));
     lines.push(String::new());
-    lines.push("> 工作管理框架：GTD（任务流） | STAR（成果记录） | PDCA（复盘改进）".to_string());
+    lines.push(tpl.subtitle.clone());
     lines.push(String::new());
     lines.push("---".to_string());
     lines.push(String::new());
-    lines.push("## 📥 Inbox - 今日新增任务".to_string());
+
+    let inbox_section = find_section(&tpl.sections, "inbox");
+    lines.push(inbox_section.heading.clone());
     lines.push(String::new());
-    lines.push("| # | 任务描述 | 来源 | 优先级 |".to_string());
-    lines.push("|---|---------|------|--------|".to_string());
+    if let Some(cols) = &inbox_section.columns {
+        for h in render_table_header(cols) { lines.push(h); }
+    }
     if report.inbox.is_empty() {
-        lines.push("| - | 无 | - | - |".to_string());
+        if let Some(empty) = &inbox_section.empty_row { lines.push(render_empty_row(empty)); }
     } else {
         for (i, t) in report.inbox.iter().enumerate() {
             lines.push(format!("| {} | {} | - | - |", i + 1, t));
@@ -188,13 +272,16 @@ fn generate_daily_markdown(report: &DailyReport) -> String {
     lines.push(String::new());
     lines.push("---".to_string());
     lines.push(String::new());
-    lines.push("## 🎯 Next Actions - 今日执行".to_string());
+
+    let actions_section = find_section(&tpl.sections, "nextActions");
+    lines.push(actions_section.heading.clone());
     lines.push(String::new());
-    lines.push("| # | 任务描述 | 所属项目 | 预计耗时 | 状态 |".to_string());
-    lines.push("|---|---------|----------|---------|------|".to_string());
+    if let Some(cols) = &actions_section.columns {
+        for h in render_table_header(cols) { lines.push(h); }
+    }
     let all_active: Vec<&Task> = report.in_progress.iter().chain(report.todo.iter()).collect();
     if all_active.is_empty() {
-        lines.push("| - | 无 | - | - | - |".to_string());
+        if let Some(empty) = &actions_section.empty_row { lines.push(render_empty_row(empty)); }
     } else {
         for (i, t) in all_active.iter().enumerate() {
             let blocked_tag = if t.blocked { " ⛔阻塞" } else { "" };
@@ -207,13 +294,16 @@ fn generate_daily_markdown(report: &DailyReport) -> String {
     lines.push(String::new());
     lines.push("---".to_string());
     lines.push(String::new());
-    lines.push("## ✅ Done - 今日完成".to_string());
+
+    let done_section = find_section(&tpl.sections, "done");
+    lines.push(done_section.heading.clone());
     lines.push(String::new());
-    lines.push("| # | 任务描述 | 所属项目 | 实际耗时 | 成果简述 |".to_string());
-    lines.push("|---|---------|----------|---------|---------|".to_string());
+    if let Some(cols) = &done_section.columns {
+        for h in render_table_header(cols) { lines.push(h); }
+    }
     let all_done: Vec<&Task> = report.completed_main.iter().chain(report.completed_side.iter()).collect();
     if all_done.is_empty() {
-        lines.push("| - | 无 | - | - | - |".to_string());
+        if let Some(empty) = &done_section.empty_row { lines.push(render_empty_row(empty)); }
     } else {
         for (i, t) in all_done.iter().enumerate() {
             let type_label = if t.task_type == "main" { "主线" } else { "支线" };
@@ -223,12 +313,15 @@ fn generate_daily_markdown(report: &DailyReport) -> String {
     lines.push(String::new());
     lines.push("---".to_string());
     lines.push(String::new());
-    lines.push("## ⏳ Waiting - 阻塞/依赖".to_string());
+
+    let waiting_section = find_section(&tpl.sections, "waiting");
+    lines.push(waiting_section.heading.clone());
     lines.push(String::new());
-    lines.push("| # | 阻塞事项 | 原因 | 需要谁协助 | 预计解决时间 |".to_string());
-    lines.push("|---|---------|------|-----------|-------------|".to_string());
+    if let Some(cols) = &waiting_section.columns {
+        for h in render_table_header(cols) { lines.push(h); }
+    }
     if report.blockers.is_empty() {
-        lines.push("| - | 无 | - | - | - |".to_string());
+        if let Some(empty) = &waiting_section.empty_row { lines.push(render_empty_row(empty)); }
     } else {
         for (i, b) in report.blockers.iter().enumerate() {
             let parts: Vec<&str> = b.splitn(2, '：').collect();
@@ -242,28 +335,44 @@ fn generate_daily_markdown(report: &DailyReport) -> String {
     lines.push(String::new());
     lines.push("---".to_string());
     lines.push(String::new());
-    lines.push("## 🔍 今日复盘 (PDCA-Check)".to_string());
+
+    let pdca_section = find_section(&tpl.sections, "pdca");
+    lines.push(pdca_section.heading.clone());
     lines.push(String::new());
-    let plan_rate = report.plan_completion_rate.map_or("_".to_string(), |r| r.to_string());
-    let actual_rate = report.actual_completion_rate.map_or("_".to_string(), |r| r.to_string());
-    lines.push(format!("**计划完成率**：{}/5 → 实际完成率：{}/5", plan_rate, actual_rate));
-    lines.push(String::new());
-    lines.push("**偏差分析**：".to_string());
-    let deviation = if report.deviation_analysis.is_empty() { "待补充".to_string() } else { report.deviation_analysis.clone() };
-    lines.push(format!("- {}", deviation));
-    lines.push(String::new());
-    lines.push("**改进措施 (PDCA-Act)**：".to_string());
-    let improvement = if report.improvement_measures.is_empty() { "待补充".to_string() } else { report.improvement_measures.clone() };
-    lines.push(format!("- {}", improvement));
-    lines.push(String::new());
-    let focus = report.focus_score.map_or("_".to_string(), |s| s.to_string());
-    lines.push(format!("**专注度评分** (1-5)：{}", focus));
+    if let Some(fields) = &pdca_section.fields {
+        let plan_rate = report.plan_completion_rate.map_or("_".to_string(), |r| r.to_string());
+        let actual_rate = report.actual_completion_rate.map_or("_".to_string(), |r| r.to_string());
+        if let Some(v) = fields.get("planCompletionRate") {
+            lines.push(v.as_str().unwrap_or_default()
+                .replace("{{plan}}", &plan_rate)
+                .replace("{{actual}}", &actual_rate));
+        }
+        lines.push(String::new());
+        if let Some(v) = fields.get("deviationAnalysis") {
+            lines.push(v.as_str().unwrap_or_default().to_string());
+        }
+        let deviation = if report.deviation_analysis.is_empty() { "待补充".to_string() } else { report.deviation_analysis.clone() };
+        lines.push(format!("- {}", deviation));
+        lines.push(String::new());
+        if let Some(v) = fields.get("improvementMeasures") {
+            lines.push(v.as_str().unwrap_or_default().to_string());
+        }
+        let improvement = if report.improvement_measures.is_empty() { "待补充".to_string() } else { report.improvement_measures.clone() };
+        lines.push(format!("- {}", improvement));
+        lines.push(String::new());
+        if let Some(v) = fields.get("focusScore") {
+            let focus = report.focus_score.map_or("_".to_string(), |s| s.to_string());
+            lines.push(v.as_str().unwrap_or_default().replace("{{score}}", &focus));
+        }
+    }
     lines.push(String::new());
     lines.push("---".to_string());
     lines.push(String::new());
-    lines.push("## 💡 明日计划".to_string());
+
+    let plan_section = find_section(&tpl.sections, "tomorrowPlan");
+    lines.push(plan_section.heading.clone());
     if report.tomorrow_plan.is_empty() {
-        lines.push("- 待规划".to_string());
+        lines.push(format!("- {}", plan_section.empty_item.as_deref().unwrap_or("待规划")));
     } else {
         for p in &report.tomorrow_plan {
             lines.push(format!("- {}", p));
@@ -271,9 +380,10 @@ fn generate_daily_markdown(report: &DailyReport) -> String {
     }
     lines.push(String::new());
     if !report.llm_content.is_empty() {
+        let llm_section = find_section(&tpl.sections, "llmContent");
         lines.push("---".to_string());
         lines.push(String::new());
-        lines.push("## 🤖 AI 辅助内容".to_string());
+        lines.push(llm_section.heading.clone());
         lines.push(report.llm_content.clone());
         lines.push(String::new());
     }
@@ -283,52 +393,67 @@ fn generate_daily_markdown(report: &DailyReport) -> String {
 // ========== Weekly Report Markdown ==========
 
 fn generate_weekly_markdown(report: &WeeklyReport) -> String {
+    let tpl = load_template("weekly-report");
     let mut lines = vec![];
-    lines.push(format!("# 📊 周报 - {} ~ {}", report.week_start, report.week_end));
+    lines.push(tpl.title.replace("{{weekStart}}", &report.week_start).replace("{{weekEnd}}", &report.week_end));
     lines.push(String::new());
-    lines.push(format!("> 基于 {} ~ {} 的日报汇总", report.week_start, report.week_end));
+    lines.push(tpl.subtitle.replace("{{weekStart}}", &report.week_start).replace("{{weekEnd}}", &report.week_end));
     lines.push(String::new());
     lines.push("---".to_string());
     lines.push(String::new());
-    lines.push("## 📋 本周任务总览".to_string());
+
+    let overview_section = find_section(&tpl.sections, "overview");
+    lines.push(overview_section.heading.clone());
     lines.push(String::new());
-    lines.push("| 类别 | 计划任务数 | 完成任务数 | 完成率 |".to_string());
-    lines.push("|------|-----------|-----------|--------|".to_string());
+    if let Some(cols) = &overview_section.columns {
+        for h in render_table_header(cols) { lines.push(h); }
+    }
     let main_completed = report.highlights.len();
     let total_issues = report.issues.len();
     let daily_count = report.daily_reports.len();
-    lines.push(format!("| 测试任务（迭代） | - | {} | - |", main_completed));
-    lines.push("| 其他任务（部署/开发等） | - | - | - |".to_string());
-    lines.push(format!("| 合计 | - | {} | - |", main_completed));
+    if let Some(rows) = &overview_section.static_rows {
+        for row in rows {
+            lines.push(format!("| {} |", row.iter().map(|c| c.replace("{{mainCompleted}}", &main_completed.to_string())).collect::<Vec<_>>().join(" | ")));
+        }
+    }
     lines.push(String::new());
     lines.push("---".to_string());
     lines.push(String::new());
+
+    let star_section = find_section(&tpl.sections, "starAchievements");
     if !report.star_achievements.is_empty() {
-        lines.push("## ✅ 关键成果 (STAR格式)".to_string());
+        lines.push(star_section.heading.clone());
         lines.push(String::new());
-        lines.push("### 测试迭代相关工作".to_string());
-        lines.push(String::new());
-        for (i, s) in report.star_achievements.iter().enumerate() {
-            lines.push(format!("**成果{}**：{}", i + 1, s.title));
-            lines.push(format!("- **S (背景)**：{}", if s.situation.is_empty() { "待补充" } else { &s.situation }));
-            lines.push(format!("- **T (目标)**：{}", if s.task.is_empty() { "待补充" } else { &s.task }));
-            lines.push(format!("- **A (行动)**：{}", if s.action.is_empty() { "待补充" } else { &s.action }));
-            lines.push(format!("- **R (结果)**：{}", if s.result.is_empty() { "待补充" } else { &s.result }));
+        if let Some(subs) = &star_section.sub_sections {
+            let iter_sub = subs.iter().find(|s| s.id == "iteration").unwrap();
+            lines.push(iter_sub.heading.clone());
+            lines.push(String::new());
+            for (i, s) in report.star_achievements.iter().enumerate() {
+                lines.push(format!("**成果{}**：{}", i + 1, s.title));
+                lines.push(format!("- **S (背景)**：{}", if s.situation.is_empty() { "待补充" } else { &s.situation }));
+                lines.push(format!("- **T (目标)**：{}", if s.task.is_empty() { "待补充" } else { &s.task }));
+                lines.push(format!("- **A (行动)**：{}", if s.action.is_empty() { "待补充" } else { &s.action }));
+                lines.push(format!("- **R (结果)**：{}", if s.result.is_empty() { "待补充" } else { &s.result }));
+                lines.push(String::new());
+            }
+            let other_sub = subs.iter().find(|s| s.id == "other").unwrap();
+            lines.push(other_sub.heading.clone());
+            lines.push(String::new());
+            lines.push(other_sub.placeholder.as_deref().unwrap_or("（待补充）").to_string());
             lines.push(String::new());
         }
-        lines.push("### 其他随机任务".to_string());
-        lines.push(String::new());
-        lines.push("（待补充）".to_string());
-        lines.push(String::new());
     }
     lines.push("---".to_string());
     lines.push(String::new());
-    lines.push("## ⏳ 阻塞事项跟踪".to_string());
+
+    let blockers_section = find_section(&tpl.sections, "blockers");
+    lines.push(blockers_section.heading.clone());
     lines.push(String::new());
-    lines.push("| 阻塞事项 | 持续天数 | 当前状态 | 下周计划 |".to_string());
-    lines.push("|---------|---------|---------|---------|".to_string());
+    if let Some(cols) = &blockers_section.columns {
+        for h in render_table_header(cols) { lines.push(h); }
+    }
     if report.issues.is_empty() {
-        lines.push("| 无 | - | - | - |".to_string());
+        if let Some(empty) = &blockers_section.empty_row { lines.push(render_empty_row(empty)); }
     } else {
         for issue in &report.issues {
             let parts: Vec<&str> = issue.splitn(2, '：').collect();
@@ -339,33 +464,52 @@ fn generate_weekly_markdown(report: &WeeklyReport) -> String {
     lines.push(String::new());
     lines.push("---".to_string());
     lines.push(String::new());
-    lines.push("## 🔍 周度复盘 (PDCA)".to_string());
+
+    let pdca_section = find_section(&tpl.sections, "pdca");
+    lines.push(pdca_section.heading.clone());
     lines.push(String::new());
-    lines.push("### Check - 偏差分析".to_string());
-    lines.push(String::new());
-    lines.push("| 维度 | 计划 | 实际 | 偏差原因 |".to_string());
-    lines.push("|------|------|------|---------|".to_string());
-    let deviation = if report.deviation_analysis.is_empty() { "待补充".to_string() } else { report.deviation_analysis.clone() };
-    lines.push(format!("| 任务完成率 | - | {}/{} | {} |", main_completed, daily_count, deviation));
-    lines.push(format!("| 专注度均值 | - | {}/5 | - |", report.avg_focus_score.as_deref().unwrap_or("-")));
-    lines.push(format!("| 阻塞解决率 | - | {}/{} | - |", if total_issues > 0 { "0" } else { "-" }, total_issues));
-    lines.push(String::new());
-    lines.push("### Act - 改进措施".to_string());
-    lines.push(String::new());
-    if report.improvement_measures.is_empty() {
-        lines.push("- 待补充".to_string());
-    } else {
-        lines.push(format!("- {}", report.improvement_measures));
+    if let Some(subs) = &pdca_section.sub_sections {
+        let check_sub = subs.iter().find(|s| s.id == "check").unwrap();
+        lines.push(check_sub.heading.clone());
+        lines.push(String::new());
+        if let Some(cols) = &check_sub.columns {
+            for h in render_table_header(cols) { lines.push(h); }
+        }
+        let deviation = if report.deviation_analysis.is_empty() { "待补充".to_string() } else { report.deviation_analysis.clone() };
+        if let Some(rows) = &check_sub.rows {
+            for row in rows {
+                lines.push(format!("| {} |", row.iter().map(|c|
+                    c.replace("{{mainCompleted}}", &main_completed.to_string())
+                     .replace("{{dailyCount}}", &daily_count.to_string())
+                     .replace("{{deviationAnalysis}}", &deviation)
+                     .replace("{{avgFocusScore}}", report.avg_focus_score.as_deref().unwrap_or("-"))
+                     .replace("{{resolvedIssues}}", if total_issues > 0 { "0" } else { "-" })
+                     .replace("{{totalIssues}}", &total_issues.to_string())
+                ).collect::<Vec<_>>().join(" | ")));
+            }
+        }
+        lines.push(String::new());
+        let act_sub = subs.iter().find(|s| s.id == "act").unwrap();
+        lines.push(act_sub.heading.clone());
+        lines.push(String::new());
+        if report.improvement_measures.is_empty() {
+            lines.push(format!("- {}", act_sub.empty_item.as_deref().unwrap_or("待补充")));
+        } else {
+            lines.push(format!("- {}", report.improvement_measures));
+        }
     }
     lines.push(String::new());
     lines.push("---".to_string());
     lines.push(String::new());
-    lines.push("## 💡 下周计划".to_string());
+
+    let plan_section = find_section(&tpl.sections, "nextWeekPlan");
+    lines.push(plan_section.heading.clone());
     lines.push(String::new());
-    lines.push("| # | 任务 | 优先级 | 预估耗时 |".to_string());
-    lines.push("|---|------|--------|---------|".to_string());
+    if let Some(cols) = &plan_section.columns {
+        for h in render_table_header(cols) { lines.push(h); }
+    }
     if report.next_week_plan.is_empty() {
-        lines.push("| - | 待规划 | - | - |".to_string());
+        if let Some(empty) = &plan_section.empty_row { lines.push(render_empty_row(empty)); }
     } else {
         for (i, p) in report.next_week_plan.iter().enumerate() {
             lines.push(format!("| {} | {} | - | - |", i + 1, p));
@@ -373,9 +517,10 @@ fn generate_weekly_markdown(report: &WeeklyReport) -> String {
     }
     lines.push(String::new());
     if !report.llm_content.is_empty() {
+        let llm_section = find_section(&tpl.sections, "llmContent");
         lines.push("---".to_string());
         lines.push(String::new());
-        lines.push("## 🤖 AI 辅助内容".to_string());
+        lines.push(llm_section.heading.clone());
         lines.push(report.llm_content.clone());
         lines.push(String::new());
     }
@@ -385,26 +530,34 @@ fn generate_weekly_markdown(report: &WeeklyReport) -> String {
 // ========== Monthly Report Markdown ==========
 
 fn generate_monthly_markdown(report: &MonthlyReport) -> String {
+    let tpl = load_template("monthly-report");
     let mut lines = vec![];
-    lines.push(format!("# 📈 月报 - {}", report.month));
+    lines.push(tpl.title.replace("{{month}}", &report.month));
     lines.push(String::new());
-    lines.push(format!("> 向上汇报 | {} 工作总结", report.month));
+    lines.push(tpl.subtitle.replace("{{month}}", &report.month));
     lines.push(String::new());
     lines.push("---".to_string());
     lines.push(String::new());
-    lines.push("## 🎯 月度工作总览".to_string());
+
+    let overview_section = find_section(&tpl.sections, "overview");
+    lines.push(overview_section.heading.clone());
     lines.push(String::new());
-    lines.push("| 类别 | 任务总数 | 完成数 | 完成率 |".to_string());
-    lines.push("|------|---------|--------|--------|".to_string());
+    if let Some(cols) = &overview_section.columns {
+        for h in render_table_header(cols) { lines.push(h); }
+    }
     let highlight_count = report.highlights.len();
-    lines.push("| 测试迭代任务 | - | - | - |".to_string());
-    lines.push("| 其他任务 | - | - | - |".to_string());
-    lines.push(format!("| 合计 | - | {} | - |", highlight_count));
+    if let Some(rows) = &overview_section.static_rows {
+        for row in rows {
+            lines.push(format!("| {} |", row.iter().map(|c| c.replace("{{highlightCount}}", &highlight_count.to_string())).collect::<Vec<_>>().join(" | ")));
+        }
+    }
     lines.push(String::new());
     lines.push("---".to_string());
     lines.push(String::new());
+
+    let iter_section = find_section(&tpl.sections, "iterationWork");
     if !report.star_achievements.is_empty() {
-        lines.push("## 📦 测试迭代工作 (STAR)".to_string());
+        lines.push(iter_section.heading.clone());
         lines.push(String::new());
         for s in &report.star_achievements {
             lines.push(format!("### {}", if s.title.is_empty() { "迭代版本" } else { &s.title }));
@@ -415,9 +568,10 @@ fn generate_monthly_markdown(report: &MonthlyReport) -> String {
             lines.push(String::new());
         }
     }
-    lines.push("## 🔧 其他专项工作 (STAR)".to_string());
+    let other_section = find_section(&tpl.sections, "otherWork");
+    lines.push(other_section.heading.clone());
     lines.push(String::new());
-    lines.push("### 专项工作".to_string());
+    lines.push(format!("### {}", other_section.default_title.as_deref().unwrap_or("专项工作")));
     lines.push("**S**：".to_string());
     lines.push("**T**：".to_string());
     lines.push("**A**：".to_string());
@@ -425,48 +579,63 @@ fn generate_monthly_markdown(report: &MonthlyReport) -> String {
     lines.push(String::new());
     lines.push("---".to_string());
     lines.push(String::new());
-    lines.push("## 📊 月度数据统计".to_string());
+
+    let stats_section = find_section(&tpl.sections, "statistics");
+    lines.push(stats_section.heading.clone());
     lines.push(String::new());
-    lines.push("| 指标 | 本月 | 上月 | 变化趋势 |".to_string());
-    lines.push("|------|------|------|---------|".to_string());
-    lines.push("| 测试迭代参与数 | - | - | → |".to_string());
-    lines.push("| Bug 发现总数 | - | - | → |".to_string());
-    lines.push("| 严重 Bug 数 | - | - | → |".to_string());
-    lines.push("| 随机任务数 | - | - | → |".to_string());
-    lines.push("| 阻塞解决率 | - | - | → |".to_string());
-    lines.push(String::new());
-    lines.push("---".to_string());
-    lines.push(String::new());
-    lines.push("## 🔍 月度复盘 (PDCA)".to_string());
-    lines.push(String::new());
-    lines.push("### Check".to_string());
-    lines.push(String::new());
-    lines.push("- **亮点**：".to_string());
-    if report.highlights.is_empty() {
-        lines.push("  - 待补充".to_string());
-    } else {
-        for h in &report.highlights {
-            lines.push(format!("  - {}", h));
+    if let Some(cols) = &stats_section.columns {
+        for h in render_table_header(cols) { lines.push(h); }
+    }
+    if let Some(rows) = &stats_section.static_rows {
+        for row in rows {
+            lines.push(format!("| {} |", row.join(" | ")));
         }
     }
-    lines.push("- **不足**：".to_string());
-    lines.push("  - 待补充".to_string());
-    lines.push("- **意外发现**：".to_string());
-    lines.push("  - 待补充".to_string());
     lines.push(String::new());
-    lines.push("### Act - 下月改进".to_string());
+    lines.push("---".to_string());
     lines.push(String::new());
-    if report.improvement_measures.is_empty() {
-        lines.push("- 待补充".to_string());
-    } else {
-        lines.push(format!("- {}", report.improvement_measures));
+
+    let pdca_section = find_section(&tpl.sections, "pdca");
+    lines.push(pdca_section.heading.clone());
+    lines.push(String::new());
+    if let Some(subs) = &pdca_section.sub_sections {
+        let check_sub = subs.iter().find(|s| s.id == "check").unwrap();
+        lines.push(check_sub.heading.clone());
+        lines.push(String::new());
+        if let Some(items) = &check_sub.items {
+            for item in items {
+                lines.push(format!("- **{}**：", item.label));
+                if item.label == "亮点" {
+                    if report.highlights.is_empty() {
+                        lines.push(format!("  - {}", item.empty_item));
+                    } else {
+                        for h in &report.highlights {
+                            lines.push(format!("  - {}", h));
+                        }
+                    }
+                } else {
+                    lines.push(format!("  - {}", item.empty_item));
+                }
+            }
+        }
+        lines.push(String::new());
+        let act_sub = subs.iter().find(|s| s.id == "act").unwrap();
+        lines.push(act_sub.heading.clone());
+        lines.push(String::new());
+        if report.improvement_measures.is_empty() {
+            lines.push(format!("- {}", act_sub.empty_item.as_deref().unwrap_or("待补充")));
+        } else {
+            lines.push(format!("- {}", report.improvement_measures));
+        }
     }
     lines.push(String::new());
     lines.push("---".to_string());
     lines.push(String::new());
-    lines.push("## 🚀 下月展望".to_string());
+
+    let plan_section = find_section(&tpl.sections, "nextMonthPlan");
+    lines.push(plan_section.heading.clone());
     if report.next_month_plan.is_empty() {
-        lines.push("- 待规划".to_string());
+        lines.push(format!("- {}", plan_section.empty_item.as_deref().unwrap_or("待规划")));
     } else {
         for p in &report.next_month_plan {
             lines.push(format!("- {}", p));
@@ -474,9 +643,10 @@ fn generate_monthly_markdown(report: &MonthlyReport) -> String {
     }
     lines.push(String::new());
     if !report.llm_content.is_empty() {
+        let llm_section = find_section(&tpl.sections, "llmContent");
         lines.push("---".to_string());
         lines.push(String::new());
-        lines.push("## 🤖 AI 辅助内容".to_string());
+        lines.push(llm_section.heading.clone());
         lines.push(report.llm_content.clone());
         lines.push(String::new());
     }
@@ -496,6 +666,7 @@ pub fn list_morning_plans(state: State<AppData>) -> Vec<MorningPlan> {
         .filter_map(|e| read_json_file::<MorningPlan>(&e.path()))
         .collect();
     plans.sort_by(|a, b| b.date.cmp(&a.date));
+    plans.dedup_by(|a, b| a.date == b.date);
     plans
 }
 
@@ -657,6 +828,7 @@ pub fn list_daily_reports(state: State<AppData>) -> Vec<DailyReport> {
         .filter_map(|e| read_json_file::<DailyReport>(&e.path()))
         .collect();
     reports.sort_by(|a, b| b.date.cmp(&a.date));
+    reports.dedup_by(|a, b| a.date == b.date);
     reports
 }
 
@@ -766,6 +938,7 @@ pub fn list_weekly_reports(state: State<AppData>) -> Vec<WeeklyReport> {
         .filter_map(|e| read_json_file::<WeeklyReport>(&e.path()))
         .collect();
     reports.sort_by(|a, b| b.week_start.cmp(&a.week_start));
+    reports.dedup_by(|a, b| a.week_start == b.week_start);
     reports
 }
 
@@ -852,6 +1025,7 @@ pub fn list_monthly_reports(state: State<AppData>) -> Vec<MonthlyReport> {
         .filter_map(|e| read_json_file::<MonthlyReport>(&e.path()))
         .collect();
     reports.sort_by(|a, b| b.month.cmp(&a.month));
+    reports.dedup_by(|a, b| a.month == b.month);
     reports
 }
 

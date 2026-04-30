@@ -1,0 +1,76 @@
+{
+  "title": "# 📊 周报 - {{weekStart}} ~ {{weekEnd}}",
+  "subtitle": "> 基于 {{weekStart}} ~ {{weekEnd}} 的日报汇总",
+  "sections": [
+    {
+      "id": "overview",
+      "heading": "## 📋 本周任务总览",
+      "type": "table",
+      "columns": ["类别", "计划任务数", "完成任务数", "完成率"],
+      "staticRows": [
+        ["测试任务（迭代）", "-", "{{mainCompleted}}", "-"],
+        ["其他任务（部署/开发等）", "-", "-", "-"],
+        ["合计", "-", "{{mainCompleted}}", "-"]
+      ]
+    },
+    {
+      "id": "starAchievements",
+      "heading": "## ✅ 关键成果 (STAR格式)",
+      "subSections": [
+        {
+          "id": "iteration",
+          "heading": "### 测试迭代相关工作",
+          "type": "star"
+        },
+        {
+          "id": "other",
+          "heading": "### 其他随机任务",
+          "type": "star-placeholder",
+          "placeholder": "（待补充）"
+        }
+      ]
+    },
+    {
+      "id": "blockers",
+      "heading": "## ⏳ 阻塞事项跟踪",
+      "type": "table",
+      "columns": ["阻塞事项", "持续天数", "当前状态", "下周计划"],
+      "emptyRow": ["无", "-", "-", "-"]
+    },
+    {
+      "id": "pdca",
+      "heading": "## 🔍 周度复盘 (PDCA)",
+      "subSections": [
+        {
+          "id": "check",
+          "heading": "### Check - 偏差分析",
+          "type": "table",
+          "columns": ["维度", "计划", "实际", "偏差原因"],
+          "rows": [
+            ["任务完成率", "-", "{{mainCompleted}}/{{dailyCount}}", "{{deviationAnalysis}}"],
+            ["专注度均值", "-", "{{avgFocusScore}}/5", "-"],
+            ["阻塞解决率", "-", "{{resolvedIssues}}/{{totalIssues}}", "-"]
+          ]
+        },
+        {
+          "id": "act",
+          "heading": "### Act - 改进措施",
+          "type": "list",
+          "emptyItem": "待补充"
+        }
+      ]
+    },
+    {
+      "id": "nextWeekPlan",
+      "heading": "## 💡 下周计划",
+      "type": "table",
+      "columns": ["#", "任务", "优先级", "预估耗时"],
+      "emptyRow": ["-", "待规划", "-", "-"]
+    },
+    {
+      "id": "llmContent",
+      "heading": "## 🤖 AI 辅助内容",
+      "type": "content"
+    }
+  ]
+}

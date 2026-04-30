@@ -1,12 +1,12 @@
 {
   "name": "workflow-app",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "tauri dev",
     "dev:client": "vite",
-    "build": "tsc -b && vite build",
+    "build": "vite build",
     "tauri:build": "tauri build",
     "lint": "eslint .",
     "preview": "vite preview"
@@ -17,7 +17,9 @@
     "lucide-react": "^1.11.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
+    "react-markdown": "^10.1.0",
     "react-router-dom": "^7.14.2",
+    "remark-gfm": "^4.0.1",
     "tailwindcss": "^4.2.4"
   },
   "devDependencies": {

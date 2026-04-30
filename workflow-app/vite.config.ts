@@ -1,11 +1,18 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import path from 'path'
 
 const host = process.env.TAURI_DEV_HOST
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  resolve: {
+    alias: {
+      '@shared': path.resolve(__dirname, '../shared/src')
+    },
+    dedupe: ['react', 'react-dom', 'react-router-dom']
+  },
   clearScreen: false,
   server: {
     port: 5173,
@@ -13,5 +20,8 @@ export default defineConfig({
     host: host || false,
     hmr: host ? { protocol: 'ws', host, port: 5174 } : undefined,
     watch: { ignored: ['**/src-tauri/**'] },
+    fs: {
+      allow: ['..']
+    }
   },
 })

@@ -4,6 +4,7 @@ import { PRIORITY_LABELS } from '../types'
 import { suggestPriority } from '../utils/priority'
 import { tagsApi } from '../api'
 import { X, Sparkles, Plus, Ban, Target, Wrench } from 'lucide-react'
+import { useScrollLock } from '../hooks/useScrollLock'
 
 interface Props {
   open: boolean
@@ -39,6 +40,8 @@ export default function TaskModal({ open, task, onClose, onSave }: Props) {
   const [tagInput, setTagInput] = useState('')
   const [showTagDropdown, setShowTagDropdown] = useState(false)
   const tagInputRef = useRef<HTMLInputElement>(null)
+
+  useScrollLock(open)
 
   useEffect(() => {
     if (open) {
@@ -132,7 +135,7 @@ export default function TaskModal({ open, task, onClose, onSave }: Props) {
   const priorityStyle = PRIORITY_COLORS[form.priority]
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1e3a5f]/30 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1e3a5f]/30 backdrop-blur-sm" onWheel={e => e.stopPropagation()}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-5 border-b border-[#e2e8f0]">
           <div className="flex items-center gap-3">

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { X, Send, Loader2, Sparkles, Bot } from 'lucide-react'
+import { useScrollLock } from '../hooks/useScrollLock'
 
 interface Props {
   open: boolean
@@ -17,6 +18,8 @@ export default function LLMDialog({ open, title, systemContext, onGenerate, onCl
   const [streaming, setStreaming] = useState(false)
   const [finalContent, setFinalContent] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  useScrollLock(open)
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -64,7 +67,7 @@ export default function LLMDialog({ open, title, systemContext, onGenerate, onCl
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1e3a5f]/30 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1e3a5f]/30 backdrop-blur-sm" onWheel={e => e.stopPropagation()}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl mx-4 max-h-[90vh] flex flex-col border border-[#e2e8f0]">
         <div className="flex items-center justify-between p-5 border-b border-[#e2e8f0] shrink-0">
           <div className="flex items-center gap-3">

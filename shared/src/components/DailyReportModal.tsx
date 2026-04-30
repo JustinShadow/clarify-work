@@ -4,6 +4,7 @@ import { getTodayDateStr } from '../utils/priority'
 import { dailyReportApi, llmApi } from '../api'
 import { X, FileText, Loader2, Sparkles, Target, Wrench, Clock, AlertTriangle, ListTodo } from 'lucide-react'
 import LLMDialog from './LLMDialog'
+import { useScrollLock } from '../hooks/useScrollLock'
 
 interface Props {
   open: boolean
@@ -19,6 +20,8 @@ export default function DailyReportModal({ open, tasks, onClose, onGenerated }: 
     .filter(t => t.blockedReason)
     .map(t => `${t.title}：${t.blockedReason}`)
   const initialBlockers = autoBlockerLines.length > 0 ? autoBlockerLines.join('\n') : ''
+
+  useScrollLock(open)
 
   const [tomorrowPlan, setTomorrowPlan] = useState('')
   const [blockers, setBlockers] = useState(initialBlockers)
@@ -63,7 +66,7 @@ export default function DailyReportModal({ open, tasks, onClose, onGenerated }: 
 
   return (
     <>
-      <div className="fixed inset-0 z-40 flex items-center justify-center bg-[#1e3a5f]/30 backdrop-blur-sm">
+      <div className="fixed inset-0 z-40 flex items-center justify-center bg-[#1e3a5f]/30 backdrop-blur-sm" onWheel={e => e.stopPropagation()}>
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
           <div className="flex items-center justify-between p-5 border-b border-[#e2e8f0] sticky top-0 bg-white z-10">
             <h3 className="text-lg font-bold text-[#1e293b] flex items-center gap-2">

@@ -33,19 +33,23 @@ export default function MorningPlanPage() {
   const [selectedDate, setSelectedDate] = useState<string>(getTodayDateStr())
   const [llmOpen, setLlmOpen] = useState(false)
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (signal?: AbortSignal) => {
     try {
       const planData = await morningPlanApi.list()
+      if (signal?.aborted) return
       setPlans(planData)
     } catch (err) {
+      if (signal?.aborted) return
       console.error(err)
     } finally {
-      setLoading(false)
+      if (!signal?.aborted) setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    fetchData()
+    const ac = new AbortController()
+    fetchData(ac.signal)
+    return () => ac.abort()
   }, [fetchData])
 
   const currentPlan = plans.find(p => p.date === selectedDate)
@@ -78,7 +82,7 @@ export default function MorningPlanPage() {
               onChange={e => setSelectedDate(e.target.value)}
               className="px-4 py-2.5 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#3b82f6] focus:border-[#3b82f6] outline-none bg-[#f8fafc]"
             >
-              {plans.length === 0 && <option value={today}>{today}</option>}
+              {!plans.some(p => p.date === today) && <option value={today}>{today} (今日)</option>}
               {plans.map(p => (
                 <option key={p.date} value={p.date}>
                   {p.date}{p.date === today ? ' (今日)' : ''}
@@ -113,7 +117,7 @@ export default function MorningPlanPage() {
               <div className="bg-white rounded-2xl border border-[#e2e8f0] shadow-sm overflow-hidden">
                 <div className="px-4 py-3 bg-[#eff6ff] border-b border-[#bfdbfe] flex items-center gap-2">
                   <Sparkles size={14} className="text-[#3b82f6]" />
-                  <span className="text-sm font-semibold text-[#1e40af]">AI 分析与建议</span>
+                  <span className="text-sm font-semibold text-[#1e40af]">AI 规划建议</span>
                 </div>
                 <div className="px-6 py-5">
                   <MarkdownContent content={currentPlan.llmContent} theme="blue" />

@@ -149,7 +149,7 @@ function WeeklyReportDetail({ report }: { report: WeeklyReport }) {
         <div>
           <p className="font-bold text-[#475569] mb-3">✅ 关键成果 (STAR)</p>
           {report.starAchievements.map((s, i) => (
-            <div key={i} className="ml-3 mb-3 bg-[#ecfdf5] rounded-xl p-3 border border-[#a7f3d0]">
+            <div key={`star-${s.title}-${i}`} className="ml-3 mb-3 bg-[#ecfdf5] rounded-xl p-3 border border-[#a7f3d0]">
               <p className="font-bold text-[#047857] text-xs mb-2">{s.title}</p>
               {s.situation && <p className="text-xs text-[#64748b]"><span className="font-semibold text-[#1e293b]">S:</span> {s.situation}</p>}
               {s.task && <p className="text-xs text-[#64748b]"><span className="font-semibold text-[#1e293b]">T:</span> {s.task}</p>}
@@ -218,7 +218,7 @@ function MonthlyReportDetail({ report }: { report: MonthlyReport }) {
         <div>
           <p className="font-bold text-[#475569] mb-3">📦 测试迭代工作 (STAR)</p>
           {report.starAchievements.map((s, i) => (
-            <div key={i} className="ml-3 mb-3 bg-[#eff6ff] rounded-xl p-3 border border-[#bfdbfe]">
+            <div key={`star-${s.title}-${i}`} className="ml-3 mb-3 bg-[#eff6ff] rounded-xl p-3 border border-[#bfdbfe]">
               <p className="font-bold text-[#1e40af] text-xs mb-2">{s.title}</p>
               {s.situation && <p className="text-xs text-[#64748b]"><span className="font-semibold text-[#1e293b]">S:</span> {s.situation}</p>}
               {s.task && <p className="text-xs text-[#64748b]"><span className="font-semibold text-[#1e293b]">T:</span> {s.task}</p>}
@@ -247,7 +247,7 @@ function MonthlyReportDetail({ report }: { report: MonthlyReport }) {
             <div key={wr.weekStart} className="ml-3 mb-3 bg-[#f8fafc] p-3 rounded-lg">
               <p className="text-xs font-bold text-[#1e3a5f] mb-2">{wr.weekStart} ~ {wr.weekEnd}</p>
               <ul className="text-xs text-[#64748b] space-y-1 ml-3">
-                {wr.highlights?.map((h, i) => <li key={i} className="flex items-center gap-1"><span className="text-[#f59e0b]">★</span> {h}</li>)}
+                {wr.highlights?.map((h, i) => <li key={`hl-${wr.weekStart}-${i}`} className="flex items-center gap-1"><span className="text-[#f59e0b]">★</span> {h}</li>)}
               </ul>
             </div>
           ))}
@@ -266,7 +266,7 @@ function Section({ title, items, empty = '无' }: { title: string; items: string
       ) : (
         <ul className="space-y-1 ml-3">
           {items.map((item, i) => (
-            <li key={i} className="text-[#64748b]">{item}</li>
+            <li key={`${title}-${i}-${item.slice(0, 20)}`} className="text-[#64748b]">{item}</li>
           ))}
         </ul>
       )}

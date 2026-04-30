@@ -45,7 +45,9 @@ export default function TaskModal({ open, task, onClose, onSave }: Props) {
 
   useEffect(() => {
     if (open) {
-      tagsApi.list().then(setAllTags).catch(() => {})
+      let stale = false
+      tagsApi.list().then(tags => { if (!stale) setAllTags(tags) }).catch(() => {})
+      return () => { stale = true }
     }
   }, [open])
 

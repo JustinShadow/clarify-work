@@ -25,6 +25,9 @@ npm-debug.log*
 .env
 .env.*
 
+# Generated reports
+reports/
+
 # App internal data (config with API keys, runtime data)
 app/app-data/
 

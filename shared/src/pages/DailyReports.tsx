@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { dailyReportApi, llmApi } from '../api'
 import type { DailyReport } from '../types'
+import { getTodayDateStr } from '../utils/priority'
 import Layout from '../components/Layout'
 import ReportCard from '../components/ReportCard'
 import LLMDialog from '../components/LLMDialog'
@@ -11,19 +12,23 @@ export default function DailyReports() {
   const [loading, setLoading] = useState(true)
   const [llmOpen, setLlmOpen] = useState(false)
 
-  const fetchReports = useCallback(async () => {
+  const fetchReports = useCallback(async (signal?: AbortSignal) => {
     try {
       const data = await dailyReportApi.list()
+      if (signal?.aborted) return
       setReports(data)
     } catch (err) {
+      if (signal?.aborted) return
       console.error(err)
     } finally {
-      setLoading(false)
+      if (!signal?.aborted) setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    fetchReports()
+    const ac = new AbortController()
+    fetchReports(ac.signal)
+    return () => ac.abort()
   }, [fetchReports])
 
   const handleDelete = async (report: DailyReport) => {
@@ -33,7 +38,7 @@ export default function DailyReports() {
     } catch (err) { console.error(err) }
   }
 
-  const today = new Date().toISOString().split('T')[0]
+  const today = getTodayDateStr()
 
   return (
     <Layout>

@@ -29,19 +29,23 @@ export default function Settings() {
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
   const [saved, setSaved] = useState(false)
 
-  const fetchConfig = useCallback(async () => {
+  const fetchConfig = useCallback(async (signal?: AbortSignal) => {
     try {
       const data = await llmApi.getConfig()
+      if (signal?.aborted) return
       setConfig(data)
     } catch (err) {
+      if (signal?.aborted) return
       console.error(err)
     } finally {
-      setLoading(false)
+      if (!signal?.aborted) setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    fetchConfig()
+    const ac = new AbortController()
+    fetchConfig(ac.signal)
+    return () => ac.abort()
   }, [fetchConfig])
 
   const handleSave = async () => {

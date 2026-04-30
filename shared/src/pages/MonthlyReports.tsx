@@ -12,19 +12,23 @@ export default function MonthlyReports() {
   const [loading, setLoading] = useState(true)
   const [llmOpen, setLlmOpen] = useState(false)
 
-  const fetchReports = useCallback(async () => {
+  const fetchReports = useCallback(async (signal?: AbortSignal) => {
     try {
       const data = await monthlyReportApi.list()
+      if (signal?.aborted) return
       setReports(data)
     } catch (err) {
+      if (signal?.aborted) return
       console.error(err)
     } finally {
-      setLoading(false)
+      if (!signal?.aborted) setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    fetchReports()
+    const ac = new AbortController()
+    fetchReports(ac.signal)
+    return () => ac.abort()
   }, [fetchReports])
 
   const handleDelete = async (report: MonthlyReport) => {

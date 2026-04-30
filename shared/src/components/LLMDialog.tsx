@@ -14,7 +14,8 @@ interface Props {
 
 export default function LLMDialog({ open, title, systemContext, onGenerate, onClose, streamFn, streamBody }: Props) {
   const [input, setInput] = useState('')
-  const [messages, setMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([])
+  const [messages, setMessages] = useState<{ id: number; role: 'user' | 'assistant'; content: string }[]>([])
+  const [msgId, setMsgId] = useState(0)
   const [streaming, setStreaming] = useState(false)
   const [finalContent, setFinalContent] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -30,7 +31,9 @@ export default function LLMDialog({ open, title, systemContext, onGenerate, onCl
     if (!userMsg || streaming) return
 
     setInput('')
-    setMessages(prev => [...prev, { role: 'user', content: userMsg }])
+    const newId = msgId + 1
+    setMsgId(newId)
+    setMessages(prev => [...prev, { id: newId, role: 'user', content: userMsg }])
     setStreaming(true)
     setFinalContent('')
 
@@ -39,11 +42,15 @@ export default function LLMDialog({ open, title, systemContext, onGenerate, onCl
       const result = await streamFn(body, (content) => {
         setFinalContent(content)
       })
-      setMessages(prev => [...prev, { role: 'assistant', content: result }])
+      const assistantId = newId + 1
+      setMsgId(assistantId)
+      setMessages(prev => [...prev, { id: assistantId, role: 'assistant', content: result }])
       setFinalContent('')
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
-      setMessages(prev => [...prev, { role: 'assistant', content: `❌ 生成失败: ${msg}` }])
+      const errId = newId + 1
+      setMsgId(errId)
+      setMessages(prev => [...prev, { id: errId, role: 'assistant', content: `❌ 生成失败: ${msg}` }])
       setFinalContent('')
     } finally {
       setStreaming(false)
@@ -102,8 +109,8 @@ export default function LLMDialog({ open, title, systemContext, onGenerate, onCl
               <p className="text-xs mt-2 text-[#94a3b8]">例如：帮我根据今天的任务情况生成日报</p>
             </div>
           )}
-          {messages.map((msg, i) => (
-            <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+          {messages.map((msg) => (
+            <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap shadow-sm ${
                 msg.role === 'user'
                   ? 'bg-[#1e3a5f] text-white'

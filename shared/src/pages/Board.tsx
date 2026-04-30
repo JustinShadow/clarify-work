@@ -16,20 +16,24 @@ export default function Board() {
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [stats, setStats] = useState<{ total: number; todo: number; inProgress: number; blocked: number; done: number; totalEstimatedMinutes: number; completedToday: number; overdueCount: number; overdueTasks: Task[]; mainCount: number; sideCount: number } | null>(null)
 
-  const fetchTasks = useCallback(async () => {
+  const fetchTasks = useCallback(async (signal?: AbortSignal) => {
     try {
       const [taskData, statsData] = await Promise.all([taskApi.list(), statsApi.get()])
+      if (signal?.aborted) return
       setTasks(sortTasksByPriority(taskData))
       setStats(statsData)
     } catch (err) {
+      if (signal?.aborted) return
       console.error('Failed to fetch tasks:', err)
     } finally {
-      setLoading(false)
+      if (!signal?.aborted) setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    fetchTasks()
+    const ac = new AbortController()
+    fetchTasks(ac.signal)
+    return () => ac.abort()
   }, [fetchTasks])
 
   const handleCreateTask = () => {

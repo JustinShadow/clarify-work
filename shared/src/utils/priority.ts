@@ -90,17 +90,24 @@ export function formatMinutes(minutes: number): string {
 
 export function isOverdue(task: Task): boolean {
   if (!task.deadline || task.status === 'done') return false
-  return new Date(task.deadline) < new Date(new Date().toISOString().split('T')[0])
+  return new Date(task.deadline) < new Date(getTodayDateStr())
 }
 
 export function getDaysUntilDeadline(deadline: string): number {
-  const now = new Date(new Date().toISOString().split('T')[0])
+  const now = new Date(getTodayDateStr())
   const dl = new Date(deadline)
   return Math.floor((dl.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
 }
 
 export function getTodayDateStr(): string {
-  return new Date().toISOString().split('T')[0]
+  return formatDateStr(new Date())
+}
+
+function formatDateStr(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
 export function getWeekRange(): { start: string; end: string } {
@@ -112,8 +119,8 @@ export function getWeekRange(): { start: string; end: string } {
   const friday = new Date(monday)
   friday.setDate(monday.getDate() + 4)
   return {
-    start: monday.toISOString().split('T')[0],
-    end: friday.toISOString().split('T')[0],
+    start: formatDateStr(monday),
+    end: formatDateStr(friday),
   }
 }
 

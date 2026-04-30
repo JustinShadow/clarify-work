@@ -1,0 +1,113 @@
+:root {
+  --color-primary: #1e3a5f;
+  --color-primary-light: #3b82f6;
+  --color-primary-lighter: #dbeafe;
+  
+  --color-accent: #f59e0b;
+  --color-accent-light: #fef3c7;
+  
+  --color-success: #10b981;
+  --color-success-light: #d1fae5;
+  --color-warning: #f97316;
+  --color-warning-light: #ffedd5;
+  --color-danger: #ef4444;
+  --color-danger-light: #fee2e2;
+  --color-info: #6366f1;
+  --color-info-light: #e0e7ff;
+  
+  --color-p0: #dc2626;
+  --color-p0-light: #fee2e2;
+  --color-p1: #ea580c;
+  --color-p1-light: #ffedd5;
+  --color-p2: #eab308;
+  --color-p2-light: #fef9c3;
+  --color-p3: #9ca3af;
+  --color-p3-light: #f3f4f6;
+  
+  --status-todo: #94a3b8;
+  --status-todo-bg: #f1f5f9;
+  --status-progress: #3b82f6;
+  --status-progress-bg: #eff6ff;
+  --status-done: #10b981;
+  --status-done-bg: #ecfdf5;
+  --status-blocked: #f97316;
+  --status-blocked-bg: #fff7ed;
+  
+  --color-bg: #f8fafc;
+  --color-card: #ffffff;
+  --color-border: #e2e8f0;
+  --color-border-light: #f1f5f9;
+  --color-text-primary: #1e293b;
+  --color-text-secondary: #64748b;
+  --color-text-tertiary: #94a3b8;
+  
+  --color-main: #1e3a5f;
+  --color-main-light: #dbeafe;
+  --color-main-border: #3b82f6;
+  --color-side: #f59e0b;
+  --color-side-light: #fef3c7;
+  --color-side-border: #fbbf24;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in-down {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 150ms ease-out;
+}
+
+.animate-fade-in-down {
+  animation: fade-in-down 150ms ease-out;
+}
+
+.priority-dot-p0 {
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.2);
+}
+
+.priority-dot-p1 {
+  box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.2);
+}
+
+.priority-dot-p2 {
+  box-shadow: 0 0 0 3px rgba(234, 179, 8, 0.2);
+}
+
+.priority-dot-p3 {
+  box-shadow: 0 0 0 3px rgba(156, 163, 175, 0.2);
+}

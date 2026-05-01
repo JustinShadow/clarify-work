@@ -672,6 +672,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "desktop-app"
+version = "1.3.0"
+dependencies = [
+ "chrono",
+ "dirs",
+ "futures-util",
+ "log",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-log",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5521,24 +5539,6 @@ dependencies = [
  "serde_json",
  "unicode-xid",
  "wasmparser",
-]
-
-[[package]]
-name = "workflow-app"
-version = "1.0.0"
-dependencies = [
- "chrono",
- "dirs",
- "futures-util",
- "log",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-log",
- "tokio",
- "uuid",
 ]
 
 [[package]]

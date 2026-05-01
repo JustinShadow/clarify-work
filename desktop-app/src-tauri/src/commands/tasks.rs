@@ -75,6 +75,16 @@ pub fn create_task(state: State<AppData>, task: TaskInput) -> Result<Task, Strin
         updated_at: now,
         completed_at: None,
         tags: task.tags.unwrap_or_default(),
+        events: task.events.unwrap_or_default().into_iter().filter_map(|v| {
+            let date = v.get("date").and_then(|d| d.as_str()).unwrap_or("").to_string();
+            let content = v.get("content").and_then(|c| c.as_str()).unwrap_or("").to_string();
+            if !content.is_empty() {
+                Some(crate::models::TaskEvent { date, content })
+            } else {
+                None
+            }
+        }).collect(),
+        result: task.result.unwrap_or_default(),
     };
     if !new_task.tags.is_empty() {
         sync_tags(&state, &new_task.tags);
@@ -116,6 +126,16 @@ pub fn update_task(state: State<AppData>, id: String, task: TaskInput) -> Result
         updated_at: now,
         completed_at: if status != "done" { None } else { completed_at },
         tags: task.tags.unwrap_or_else(|| existing.tags.clone()),
+        events: task.events.map(|evts| evts.into_iter().filter_map(|v| {
+            let date = v.get("date").and_then(|d| d.as_str()).unwrap_or("").to_string();
+            let content = v.get("content").and_then(|c| c.as_str()).unwrap_or("").to_string();
+            if !content.is_empty() {
+                Some(crate::models::TaskEvent { date, content })
+            } else {
+                None
+            }
+        }).collect()).unwrap_or_else(|| existing.events.clone()),
+        result: task.result.unwrap_or_else(|| existing.result.clone()),
     };
     if !updated.tags.is_empty() {
         sync_tags(&state, &updated.tags);

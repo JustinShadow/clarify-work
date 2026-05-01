@@ -161,6 +161,10 @@ export default function TaskCard({ task, onEdit, onStatusChange, onDelete }: Pro
               <span className="text-[#f97316] truncate max-w-[120px]">{task.blockedReason}</span>
             )}
 
+            {task.status === 'done' && task.result && (
+              <span className="text-[#10b981] truncate max-w-[180px]">{task.result}</span>
+            )}
+
             {visibleTags.length > 0 && (
               <span className="text-[#94a3b8]">
                 {visibleTags.map(t => `#${t}`).join(' ')}
@@ -170,14 +174,18 @@ export default function TaskCard({ task, onEdit, onStatusChange, onDelete }: Pro
           </div>
         </div>
 
-        {(task.status === 'in_progress' || task.status === 'done') && (
+        {(task.status === 'done' && task.result) ? (
+          <div className="w-full h-[3px] bg-[#f1f5f9]">
+            <div className="h-full bg-[#10b981] w-full" />
+          </div>
+        ) : (task.status === 'in_progress' || task.status === 'done') ? (
           <div className="w-full h-[3px] bg-[#f1f5f9]">
             <div
               className={`h-full ${progressColor} transition-all duration-300`}
               style={{ width: `${progress}%` }}
             />
           </div>
-        )}
+        ) : null}
       </div>
 
       <HoverDetail

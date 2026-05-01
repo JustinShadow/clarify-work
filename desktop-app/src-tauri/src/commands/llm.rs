@@ -16,7 +16,7 @@ fn read_llm_config(state: &AppData) -> LLMConfig {
             base_url: "https://api.openai.com/v1".to_string(),
             model: "gpt-4o-mini".to_string(),
             temperature: 0.7,
-            max_tokens: 4096,
+            max_tokens: 8192,
         };
     }
     let content = fs::read_to_string(&path).unwrap_or_default();
@@ -232,6 +232,30 @@ pub async fn llm_stream_generate(
     Ok(())
 }
 
+fn task_to_context(t: &crate::models::Task) -> serde_json::Value {
+    let recent_events: Vec<serde_json::Value> = t.events.iter()
+        .rev().take(3).rev()
+        .map(|e| serde_json::json!({"date": e.date, "content": e.content}))
+        .collect();
+    let desc = t.description.chars().take(200).collect::<String>();
+    let project = t.tags.first().cloned().unwrap_or_default();
+    serde_json::json!({
+        "title": t.title,
+        "description": desc,
+        "project": project,
+        "priority": t.priority,
+        "type": t.task_type,
+        "progress": t.progress,
+        "estimatedMinutes": t.estimated_minutes,
+        "blocked": t.blocked,
+        "blockedReason": t.blocked_reason,
+        "deadline": t.deadline.as_deref().unwrap_or(""),
+        "tags": t.tags,
+        "result": t.result,
+        "recentEvents": recent_events,
+    })
+}
+
 fn build_context(state: &AppData, endpoint: &str, body: &serde_json::Value) -> Result<serde_json::Value, String> {
     use crate::commands::tasks;
     use crate::commands::reports::{reports_dir, today, yesterday, read_json_file};
@@ -246,26 +270,33 @@ fn build_context(state: &AppData, endpoint: &str, body: &serde_json::Value) -> R
             let yesterday_file = reports_dir(state).join("daily").join(format!("{}.json", yesterday_date));
             let yesterday_report = read_json_file::<crate::models::DailyReport>(&yesterday_file);
 
-            let in_progress: Vec<String> = tasks.iter()
+            let in_progress: Vec<serde_json::Value> = tasks.iter()
                 .filter(|t| t.status == "in_progress")
-                .map(|t| format!("{} [{}] P{} {}%{}", t.title, t.task_type, t.priority.trim_start_matches('P'), t.progress, if t.blocked { format!(" 阻塞:{}", t.blocked_reason) } else { String::new() }))
+                .map(|t| task_to_context(t))
                 .collect();
-            let todo: Vec<String> = tasks.iter()
+            let todo: Vec<serde_json::Value> = tasks.iter()
                 .filter(|t| t.status == "todo")
-                .map(|t| format!("{} [{}] {}", t.title, t.task_type, t.priority))
+                .map(|t| task_to_context(t))
                 .collect();
-            let blocked: Vec<String> = tasks.iter()
+            let blocked: Vec<serde_json::Value> = tasks.iter()
                 .filter(|t| t.blocked)
-                .map(|t| format!("{}: {}", t.title, t.blocked_reason))
+                .map(|t| task_to_context(t))
                 .collect();
 
-            let yesterday_data = yesterday_report.map(|yr| serde_json::json!({
-                "completedMain": yr.completed_main.iter().map(|t| &t.title).collect::<Vec<_>>(),
-                "completedSide": yr.completed_side.iter().map(|t| &t.title).collect::<Vec<_>>(),
-                "inProgress": yr.in_progress.iter().map(|t| format!("{}({}%)", t.title, t.progress)).collect::<Vec<_>>(),
-                "blockers": yr.blockers,
-                "tomorrowPlan": yr.tomorrow_plan,
-            }));
+            let yesterday_data = yesterday_report.map(|yr| {
+                let completed_main: Vec<serde_json::Value> = yr.completed_main.iter().map(|t| task_to_context(t)).collect();
+                let completed_side: Vec<serde_json::Value> = yr.completed_side.iter().map(|t| task_to_context(t)).collect();
+                let in_prog: Vec<serde_json::Value> = yr.in_progress.iter().map(|t| task_to_context(t)).collect();
+                serde_json::json!({
+                    "completedMain": completed_main,
+                    "completedSide": completed_side,
+                    "inProgress": in_prog,
+                    "blockers": yr.blockers,
+                    "tomorrowPlan": yr.tomorrow_plan,
+                    "deviationAnalysis": yr.deviation_analysis,
+                    "improvementMeasures": yr.improvement_measures,
+                })
+            });
 
             Ok(serde_json::json!({
                 "date": date,
@@ -282,24 +313,39 @@ fn build_context(state: &AppData, endpoint: &str, body: &serde_json::Value) -> R
             let morning_plan_file = reports_dir(state).join("morning-plan").join(format!("{}.json", date));
             let morning_plan = read_json_file::<crate::models::MorningPlan>(&morning_plan_file);
 
-            let completed_main: Vec<String> = tasks.iter()
+            let completed_main: Vec<serde_json::Value> = tasks.iter()
                 .filter(|t| t.task_type == "main" && t.status == "done" && t.completed_at.as_deref().map(|c| c.starts_with(&date)).unwrap_or(false))
-                .map(|t| t.title.clone()).collect();
-            let completed_side: Vec<String> = tasks.iter()
-                .filter(|t| t.task_type == "side" && t.status == "done" && t.completed_at.as_deref().map(|c| c.starts_with(&date)).unwrap_or(false))
-                .map(|t| t.title.clone()).collect();
-            let in_progress: Vec<String> = tasks.iter()
-                .filter(|t| t.status == "in_progress")
-                .map(|t| format!("{} [{}] {}%{}", t.title, t.task_type, t.progress, if t.blocked { format!(" 阻塞:{}", t.blocked_reason) } else { String::new() }))
+                .map(|t| task_to_context(t))
                 .collect();
-            let todo: Vec<String> = tasks.iter().filter(|t| t.status == "todo").map(|t| t.title.clone()).collect();
-            let blocked: Vec<String> = tasks.iter().filter(|t| t.blocked).map(|t| format!("{}: {}", t.title, t.blocked_reason)).collect();
+            let completed_side: Vec<serde_json::Value> = tasks.iter()
+                .filter(|t| t.task_type == "side" && t.status == "done" && t.completed_at.as_deref().map(|c| c.starts_with(&date)).unwrap_or(false))
+                .map(|t| task_to_context(t))
+                .collect();
+            let in_progress: Vec<serde_json::Value> = tasks.iter()
+                .filter(|t| t.status == "in_progress")
+                .map(|t| task_to_context(t))
+                .collect();
+            let todo: Vec<serde_json::Value> = tasks.iter()
+                .filter(|t| t.status == "todo")
+                .map(|t| task_to_context(t))
+                .collect();
+            let blocked: Vec<serde_json::Value> = tasks.iter()
+                .filter(|t| t.blocked)
+                .map(|t| task_to_context(t))
+                .collect();
 
-            let morning_plan_data = morning_plan.map(|mp| serde_json::json!({
-                "nextActions": mp.next_actions.iter().map(|a| &a.title).collect::<Vec<_>>(),
-                "inbox": mp.inbox,
-                "waiting": mp.waiting.iter().map(|w| &w.title).collect::<Vec<_>>(),
-            }));
+            let morning_plan_data = morning_plan.map(|mp| {
+                let next_actions: Vec<serde_json::Value> = mp.next_actions.iter().map(|a| serde_json::json!({
+                    "title": a.title, "type": a.task_type, "priority": a.priority, "progress": a.progress, "blocked": a.blocked, "blockedReason": a.blocked_reason,
+                })).collect();
+                let waiting: Vec<serde_json::Value> = mp.waiting.iter().map(|w| serde_json::json!({"title": w.title, "reason": w.reason})).collect();
+                serde_json::json!({
+                    "nextActions": next_actions,
+                    "inbox": mp.inbox,
+                    "waiting": waiting,
+                    "notes": mp.notes,
+                })
+            });
 
             Ok(serde_json::json!({
                 "date": date,
@@ -324,14 +370,19 @@ fn build_context(state: &AppData, endpoint: &str, body: &serde_json::Value) -> R
                 for entry in entries.flatten() {
                     if let Some(report) = read_json_file::<crate::models::DailyReport>(&entry.path()) {
                         if report.date >= week_start && report.date <= week_end {
+                            let completed_main: Vec<serde_json::Value> = report.completed_main.iter().map(|t| task_to_context(t)).collect();
+                            let completed_side: Vec<serde_json::Value> = report.completed_side.iter().map(|t| task_to_context(t)).collect();
+                            let in_prog: Vec<serde_json::Value> = report.in_progress.iter().map(|t| task_to_context(t)).collect();
                             daily_reports_data.push(serde_json::json!({
                                 "date": report.date,
-                                "completedMain": report.completed_main.iter().map(|t| &t.title).collect::<Vec<_>>(),
-                                "completedSide": report.completed_side.iter().map(|t| &t.title).collect::<Vec<_>>(),
-                                "inProgress": report.in_progress.iter().map(|t| format!("{}({}%)", t.title, t.progress)).collect::<Vec<_>>(),
+                                "completedMain": completed_main,
+                                "completedSide": completed_side,
+                                "inProgress": in_prog,
                                 "blockers": report.blockers,
                                 "focusScore": report.focus_score,
                                 "tomorrowPlan": report.tomorrow_plan,
+                                "deviationAnalysis": report.deviation_analysis,
+                                "improvementMeasures": report.improvement_measures,
                             }));
                         }
                     }
@@ -354,6 +405,9 @@ fn build_context(state: &AppData, endpoint: &str, body: &serde_json::Value) -> R
                 for entry in entries.flatten() {
                     if let Some(report) = read_json_file::<crate::models::WeeklyReport>(&entry.path()) {
                         if report.week_start.starts_with(&month) {
+                            let stars: Vec<serde_json::Value> = report.star_achievements.iter().map(|s| serde_json::json!({
+                                "title": s.title, "situation": s.situation, "task": s.task, "action": s.action, "result": s.result,
+                            })).collect();
                             weekly_reports_data.push(serde_json::json!({
                                 "weekStart": report.week_start,
                                 "weekEnd": report.week_end,
@@ -361,6 +415,9 @@ fn build_context(state: &AppData, endpoint: &str, body: &serde_json::Value) -> R
                                 "issues": report.issues,
                                 "nextWeekPlan": report.next_week_plan,
                                 "avgFocusScore": report.avg_focus_score,
+                                "deviationAnalysis": report.deviation_analysis,
+                                "improvementMeasures": report.improvement_measures,
+                                "starAchievements": stars,
                             }));
                         }
                     }

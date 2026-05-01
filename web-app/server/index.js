@@ -96,7 +96,7 @@ function getToday() {
 
 function readLLMConfig() {
   if (!fs.existsSync(LLM_CONFIG_FILE)) {
-    return { provider: 'openai', apiKey: '', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini', temperature: 0.7, maxTokens: 4096 }
+    return { provider: 'openai', apiKey: '', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini', temperature: 0.7, maxTokens: 8192 }
   }
   return JSON.parse(fs.readFileSync(LLM_CONFIG_FILE, 'utf-8'))
 }
@@ -165,6 +165,8 @@ app.post('/api/tasks', (req, res) => {
     updatedAt: now,
     completedAt: null,
     tags: req.body.tags || [],
+    events: req.body.events || [],
+    result: req.body.result || '',
   }
   if (task.tags.length > 0) syncTags(task.tags)
   tasks.push(task)
@@ -1041,6 +1043,25 @@ app.post('/api/llm/test', async (req, res) => {
   }
 })
 
+
+function taskToContext(t) {
+  return {
+    title: t.title,
+    description: (t.description || '').slice(0, 200),
+    project: (t.tags || [])[0] || '',
+    priority: t.priority,
+    type: t.type,
+    progress: t.progress ?? 0,
+    estimatedMinutes: t.estimatedMinutes || 30,
+    blocked: t.blocked || false,
+    blockedReason: t.blockedReason || '',
+    deadline: t.deadline || '',
+    tags: t.tags || [],
+    result: t.result || '',
+    recentEvents: (t.events || []).slice(-3),
+  }
+}
+
 // ========== LLM Generate APIs (Streaming) ==========
 
 app.post('/api/llm/generate-morning-plan', async (req, res) => {
@@ -1060,16 +1081,18 @@ app.post('/api/llm/generate-morning-plan', async (req, res) => {
   const contextData = {
     date,
     yesterdayReport: yesterdayReport ? {
-      completedMain: yesterdayReport.completedMain?.map(t => t.title) || [],
-      completedSide: yesterdayReport.completedSide?.map(t => t.title) || [],
-      inProgress: yesterdayReport.inProgress?.map(t => `${t.title}(${t.progress}%${t.type ? ' ' + t.type : ''})`) || [],
+      completedMain: (yesterdayReport.completedMain || []).map(t => typeof t === 'string' ? t : taskToContext(t)),
+      completedSide: (yesterdayReport.completedSide || []).map(t => typeof t === 'string' ? t : taskToContext(t)),
+      inProgress: (yesterdayReport.inProgress || []).map(t => typeof t === 'string' ? t : taskToContext(t)),
       blockers: yesterdayReport.blockers || [],
       tomorrowPlan: yesterdayReport.tomorrowPlan || [],
+      deviationAnalysis: yesterdayReport.deviationAnalysis || '',
+      improvementMeasures: yesterdayReport.improvementMeasures || '',
     } : null,
     currentTasks: {
-      inProgress: inProgress.map(t => `${t.title} [${t.type}] ${t.priority} ${t.progress}% 预估${t.estimatedMinutes}min${t.blocked ? ' 阻塞:' + t.blockedReason : ''}`),
-      todo: todo.map(t => `${t.title} [${t.type}] ${t.priority} 预估${t.estimatedMinutes}min`),
-      blocked: blocked.map(t => `${t.title} [${t.type}] ${t.priority} ${t.progress}% 阻塞原因:${t.blockedReason}`),
+      inProgress: inProgress.map(taskToContext),
+      todo: todo.map(taskToContext),
+      blocked: blocked.map(taskToContext),
     },
     userInput: req.body.userInput || '',
   }
@@ -1116,15 +1139,18 @@ app.post('/api/llm/generate-daily', async (req, res) => {
   const contextData = {
     date,
     morningPlan: morningPlan ? {
-      nextActions: morningPlan.nextActions?.map(t => t.title) || [],
+      nextActions: (morningPlan.nextActions || []).map(t => ({
+        title: t.title, type: t.type, priority: t.priority, progress: t.progress ?? 0, blocked: t.blocked || false, blockedReason: t.blockedReason || '',
+      })),
       inbox: morningPlan.inbox || [],
-      waiting: morningPlan.waiting || [],
+      waiting: (morningPlan.waiting || []).map(t => typeof t === 'string' ? t : { title: t.title, reason: t.reason || '' }),
+      notes: morningPlan.notes || '',
     } : null,
-    completedMain: completedMain.map(t => t.title),
-    completedSide: completedSide.map(t => t.title),
-    inProgress: inProgress.map(t => `${t.title} [${t.type}] ${t.progress}% ${t.blocked ? '阻塞:' + t.blockedReason : ''}`),
-    todo: todo.map(t => t.title),
-    blocked: blocked.map(t => `${t.title}: ${t.blockedReason}`),
+    completedMain: completedMain.map(taskToContext),
+    completedSide: completedSide.map(taskToContext),
+    inProgress: inProgress.map(taskToContext),
+    todo: todo.map(taskToContext),
+    blocked: blocked.map(taskToContext),
     userInput: req.body.userInput || '',
     focusScore: req.body.focusScore,
     tomorrowPlan: req.body.tomorrowPlan || [],
@@ -1172,12 +1198,14 @@ app.post('/api/llm/generate-weekly', async (req, res) => {
     weekEnd,
     dailyReports: dailyReports.map(r => ({
       date: r.date,
-      completedMain: (r.completedMain || []).map(t => t.title),
-      completedSide: (r.completedSide || []).map(t => t.title),
-      inProgress: (r.inProgress || []).map(t => `${t.title}(${t.progress}%)`),
+      completedMain: (r.completedMain || []).map(t => typeof t === 'string' ? t : taskToContext(t)),
+      completedSide: (r.completedSide || []).map(t => typeof t === 'string' ? t : taskToContext(t)),
+      inProgress: (r.inProgress || []).map(t => typeof t === 'string' ? t : taskToContext(t)),
       blockers: r.blockers || [],
       focusScore: r.focusScore,
       tomorrowPlan: r.tomorrowPlan || [],
+      deviationAnalysis: r.deviationAnalysis || '',
+      improvementMeasures: r.improvementMeasures || '',
     })),
     userInput: req.body.userInput || '',
   }
@@ -1228,6 +1256,11 @@ app.post('/api/llm/generate-monthly', async (req, res) => {
       issues: r.issues || [],
       nextWeekPlan: r.nextWeekPlan || [],
       avgFocusScore: r.avgFocusScore,
+      deviationAnalysis: r.deviationAnalysis || '',
+      improvementMeasures: r.improvementMeasures || '',
+      starAchievements: (r.starAchievements || []).map(s => ({
+        title: s.title, situation: s.situation, task: s.task, action: s.action, result: s.result,
+      })),
     })),
     userInput: req.body.userInput || '',
   }

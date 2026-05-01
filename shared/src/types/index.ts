@@ -2,6 +2,11 @@ export type TaskType = 'main' | 'side'
 export type TaskPriority = 'P0' | 'P1' | 'P2' | 'P3'
 export type TaskStatus = 'todo' | 'in_progress' | 'done'
 
+export interface TaskEvent {
+  date: string
+  content: string
+}
+
 export interface Task {
   id: string
   title: string
@@ -18,6 +23,8 @@ export interface Task {
   updatedAt: string
   completedAt: string | null
   tags: string[]
+  events: TaskEvent[]
+  result: string
 }
 
 export interface MorningPlan {

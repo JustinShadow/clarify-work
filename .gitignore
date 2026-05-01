@@ -29,10 +29,10 @@ npm-debug.log*
 reports/
 
 # App internal data (config with API keys, runtime data)
-app/app-data/
+web-app/app-data/
 
 # Legacy data dir (pre-v0.3.0)
-app/server/data/llm-config.json
+web-app/server/data/llm-config.json
 
 # OS
 Thumbs.db

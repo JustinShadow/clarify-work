@@ -1,12 +1,12 @@
-# WorkFlow Desktop App
+# Clarify Desktop App
 
 工作汇报管理系统桌面版，基于 React + Vite + Tauri 2 构建。
 
 ## 架构
 
 ```
-workflow-app/
-├── src/                    # 前端源码（与 app/src 同步）
+desktop-app/
+├── src/                    # 前端源码（与 web-app/src 同步）
 │   ├── api/index.ts        # API 调用
 │   ├── components/         # 组件
 │   ├── pages/              # 页面
@@ -65,7 +65,7 @@ npm run tauri:build
 
 | 配置项 | 值 |
 |--------|-----|
-| 产品名 | WorkFlow |
+| 产品名 | Clarify |
 | 版本 | 0.1.0 |
 | 窗口尺寸 | 1280 x 800 |
 | 可调整大小 | 是 |
@@ -73,7 +73,7 @@ npm run tauri:build
 
 ## 与 Web 版的差异
 
-| 特性 | Web 版 (app) | 桌面版 (workflow-app) |
+| 特性 | Web 版 (web-app) | 桌面版 (desktop-app) |
 |------|-------------|----------------------|
 | 后端 | Express (Node.js) | Tauri (Rust) |
 | 数据存储 | app-data/ JSON 文件 | 应用数据目录 |

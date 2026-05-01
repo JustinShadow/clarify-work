@@ -26,12 +26,29 @@ export default function DailyReportModal({ open, tasks, onClose, onGenerated }: 
   const [tomorrowPlan, setTomorrowPlan] = useState('')
   const [blockers, setBlockers] = useState(initialBlockers)
   const [notes, setNotes] = useState('')
-  const [focusScore, setFocusScore] = useState(0)
+  const [focusScore, setFocusScore] = useState<number | null>(null)
   const [deviationAnalysis, setDeviationAnalysis] = useState('')
   const [improvementMeasures, setImprovementMeasures] = useState('')
   const [generating, setGenerating] = useState(false)
   const [llmOpen, setLlmOpen] = useState(false)
   const [llmContent, setLlmContent] = useState('')
+
+  const extractFromLlmContent = (content: string) => {
+    setLlmContent(content)
+    const focusMatch = content.match(/专注度评分[^：]*[：:]\s*(\d)/)
+    if (focusMatch) {
+      const score = parseInt(focusMatch[1], 10)
+      if (score >= 1 && score <= 5 && focusScore === null) setFocusScore(score)
+    }
+    if (!deviationAnalysis) {
+      const devMatch = content.match(/\*\*偏差分析\*\*[：:]?\s*\n([\s\S]*?)(?=\n\*\*|\n##|$)/)
+      if (devMatch?.[1]?.trim()) setDeviationAnalysis(devMatch[1].trim())
+    }
+    if (!improvementMeasures) {
+      const impMatch = content.match(/\*\*改进措施[^*]*\*\*[：:]?\s*\n([\s\S]*?)(?=\n\*\*|\n##|$)/)
+      if (impMatch?.[1]?.trim()) setImprovementMeasures(impMatch[1].trim())
+    }
+  }
 
   const completedMain = tasks.filter(t => t.type === 'main' && t.status === 'done' && t.completedAt?.startsWith(today))
   const completedSide = tasks.filter(t => t.type === 'side' && t.status === 'done' && t.completedAt?.startsWith(today))
@@ -46,7 +63,7 @@ export default function DailyReportModal({ open, tasks, onClose, onGenerated }: 
         tomorrowPlan: tomorrowPlan.split('\n').filter(Boolean),
         blockers: blockers.split('\n').filter(Boolean),
         notes,
-        focusScore: focusScore || undefined,
+        focusScore: focusScore ?? undefined,
         deviationAnalysis,
         improvementMeasures,
         llmContent,
@@ -280,7 +297,7 @@ export default function DailyReportModal({ open, tasks, onClose, onGenerated }: 
         open={llmOpen}
         title="AI 生成日报"
         systemContext={contextSummary}
-        onGenerate={setLlmContent}
+        onGenerate={extractFromLlmContent}
         onClose={() => setLlmOpen(false)}
         streamFn={(body, onChunk) => llmApi.streamGenerate('/llm/generate-daily', body, onChunk)}
         streamBody={{ date: today }}

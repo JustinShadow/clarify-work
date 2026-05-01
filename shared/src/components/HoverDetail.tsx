@@ -141,6 +141,27 @@ export default function HoverDetail({ task, anchorRef, visible }: {
           </div>
         )}
 
+        {task.events && task.events.length > 0 && (
+          <div className="space-y-1">
+            <span className="text-[10px] font-semibold text-[#64748b]">执行记录</span>
+            {task.events.slice(0, 2).map((ev, i) => (
+              <div key={i} className="flex gap-1.5 text-[11px]">
+                <span className="shrink-0 text-[#94a3b8]">{ev.date.slice(5)}</span>
+                <span className="text-[#475569] truncate">{ev.content}</span>
+              </div>
+            ))}
+            {task.events.length > 2 && (
+              <span className="text-[10px] text-[#94a3b8]">+{task.events.length - 2} 条记录</span>
+            )}
+          </div>
+        )}
+
+        {task.status === 'done' && task.result && (
+          <div className="px-3 py-2 bg-[#ecfdf5] rounded-lg text-xs text-[#065f46] border border-[#a7f3d0]">
+            ✅ {task.result}
+          </div>
+        )}
+
         {priority.reason && task.status !== 'done' && !task.blocked && (
           <p className="text-[10px] text-[#94a3b8] italic flex items-center gap-1">
             <Sparkles size={10} /> {priority.reason}

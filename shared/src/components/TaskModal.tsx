@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
-import type { Task, TaskType, TaskPriority } from '../types'
+import type { Task, TaskType, TaskPriority, TaskEvent } from '../types'
 import { PRIORITY_LABELS } from '../types'
 import { suggestPriority } from '../utils/priority'
 import { tagsApi } from '../api'
-import { X, Sparkles, Plus, Ban, Target, Wrench } from 'lucide-react'
+import { X, Sparkles, Plus, Ban, Target, Wrench, Calendar, CheckCircle2, Trash2 } from 'lucide-react'
 import { useScrollLock } from '../hooks/useScrollLock'
 
 interface Props {
@@ -25,6 +25,8 @@ const EMPTY_TASK = {
   estimatedMinutes: 30,
   deadline: '',
   tags: [] as string[],
+  events: [] as TaskEvent[],
+  result: '',
 }
 
 const PRIORITY_COLORS: Record<TaskPriority, { bg: string; text: string; border: string }> = {
@@ -34,12 +36,22 @@ const PRIORITY_COLORS: Record<TaskPriority, { bg: string; text: string; border: 
   P3: { bg: 'bg-[#f3f4f6]', text: 'text-[#6b7280]', border: 'border-[#e5e7eb]' },
 }
 
+function getToday() {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 export default function TaskModal({ open, task, onClose, onSave }: Props) {
   const [form, setForm] = useState(EMPTY_TASK)
   const [allTags, setAllTags] = useState<string[]>([])
   const [tagInput, setTagInput] = useState('')
   const [showTagDropdown, setShowTagDropdown] = useState(false)
+  const [eventsExpanded, setEventsExpanded] = useState(false)
   const tagInputRef = useRef<HTMLInputElement>(null)
+  const resultInputRef = useRef<HTMLInputElement>(null)
 
   useScrollLock(open)
 
@@ -65,12 +77,15 @@ export default function TaskModal({ open, task, onClose, onSave }: Props) {
         estimatedMinutes: task.estimatedMinutes,
         deadline: task.deadline || '',
         tags: [...task.tags],
+        events: [...(task.events || [])],
+        result: task.result || '',
       })
     } else {
-      setForm({ ...EMPTY_TASK, tags: [] })
+      setForm({ ...EMPTY_TASK, tags: [], events: [] })
     }
     setTagInput('')
     setShowTagDropdown(false)
+    setEventsExpanded(false)
   }, [task, open])
 
   const handleAutoPriority = () => {
@@ -89,6 +104,7 @@ export default function TaskModal({ open, task, onClose, onSave }: Props) {
     if (tagInput.trim() && !finalTags.includes(tagInput.trim())) {
       finalTags.push(tagInput.trim())
     }
+    const filteredEvents = form.events.filter(ev => ev.content.trim())
     onSave({
       title: form.title.trim(),
       description: form.description.trim(),
@@ -101,6 +117,8 @@ export default function TaskModal({ open, task, onClose, onSave }: Props) {
       estimatedMinutes: form.estimatedMinutes,
       deadline: form.deadline || null,
       tags: finalTags,
+      events: filteredEvents,
+      result: form.status === 'done' ? form.result.trim() : '',
     })
   }
 
@@ -128,9 +146,31 @@ export default function TaskModal({ open, task, onClose, onSave }: Props) {
     }
   }
 
+  const addEvent = () => {
+    const newEvent: TaskEvent = { date: getToday(), content: '' }
+    setForm(f => ({ ...f, events: [newEvent, ...f.events] }))
+    setEventsExpanded(true)
+  }
+
+  const updateEvent = (index: number, field: keyof TaskEvent, value: string) => {
+    setForm(f => ({
+      ...f,
+      events: f.events.map((ev, i) => i === index ? { ...ev, [field]: value } : ev),
+    }))
+  }
+
+  const removeEvent = (index: number) => {
+    setForm(f => ({ ...f, events: f.events.filter((_, i) => i !== index) }))
+  }
+
   const filteredTags = allTags.filter(
     t => !form.tags.includes(t) && t.toLowerCase().includes(tagInput.toLowerCase())
   )
+
+  const showEvents = form.status === 'in_progress' || form.status === 'done'
+  const showResult = form.status === 'done'
+  const visibleEvents = eventsExpanded ? form.events : form.events.slice(0, 3)
+  const hasMoreEvents = form.events.length > 3
 
   if (!open) return null
 
@@ -170,13 +210,13 @@ export default function TaskModal({ open, task, onClose, onSave }: Props) {
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-[#475569] mb-1.5">描述</label>
+            <label className="block text-sm font-semibold text-[#475569] mb-1.5">需求描述</label>
             <textarea
               value={form.description}
               onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
               className="w-full px-4 py-2.5 border border-[#e2e8f0] rounded-xl focus:ring-2 focus:ring-[#3b82f6] focus:border-[#3b82f6] outline-none text-sm bg-[#f8fafc] resize-y min-h-[80px]"
               rows={3}
-              placeholder="任务描述（可选）"
+              placeholder="需求/目标简述，如：验证V3.0字体加载加速功能，对比优化前后加载耗时"
             />
           </div>
 
@@ -272,13 +312,19 @@ export default function TaskModal({ open, task, onClose, onSave }: Props) {
               <label className="block text-sm font-semibold text-[#475569] mb-1.5">状态</label>
               <select
                 value={form.status}
-                onChange={e => setForm(f => ({
-                  ...f,
-                  status: e.target.value as Task['status'],
-                  progress: e.target.value === 'done' ? 100 : f.progress,
-                  blocked: e.target.value === 'done' ? false : f.blocked,
-                  blockedReason: e.target.value === 'done' ? '' : f.blockedReason,
-                }))}
+                onChange={e => {
+                  const newStatus = e.target.value as Task['status']
+                  setForm(f => ({
+                    ...f,
+                    status: newStatus,
+                    progress: newStatus === 'done' ? 100 : f.progress,
+                    blocked: newStatus === 'done' ? false : f.blocked,
+                    blockedReason: newStatus === 'done' ? '' : f.blockedReason,
+                  }))
+                  if (newStatus === 'done') {
+                    setTimeout(() => resultInputRef.current?.focus(), 50)
+                  }
+                }}
                 className="w-full px-4 py-2.5 border border-[#e2e8f0] rounded-xl focus:ring-2 focus:ring-[#3b82f6] focus:border-[#3b82f6] outline-none text-sm bg-[#f8fafc]"
               >
                 <option value="todo">⏸️ 待办</option>
@@ -327,6 +373,95 @@ export default function TaskModal({ open, task, onClose, onSave }: Props) {
               </div>
             )}
           </div>
+
+          {showEvents && (
+            <div className="border border-[#e2e8f0] rounded-xl p-4 bg-[#f8fafc]">
+              <div className="flex items-center justify-between mb-3">
+                <label className="flex items-center gap-2 text-sm font-semibold text-[#475569]">
+                  <Calendar size={16} className="text-[#3b82f6]" />
+                  执行日志
+                </label>
+                <button
+                  type="button"
+                  onClick={addEvent}
+                  className="inline-flex items-center gap-1 text-xs text-[#3b82f6] hover:text-[#1e40af] font-medium"
+                >
+                  <Plus size={14} /> 添加记录
+                </button>
+              </div>
+              {form.events.length === 0 ? (
+                <div className="text-xs text-[#94a3b8] text-center py-3">
+                  暂无执行记录，点击"添加记录"开始
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {visibleEvents.map((ev, index) => (
+                    <div key={index} className="flex items-center gap-2 group">
+                      <input
+                        type="date"
+                        value={ev.date}
+                        onChange={e => updateEvent(index, 'date', e.target.value)}
+                        className="shrink-0 w-[130px] px-2 py-1.5 border border-[#e2e8f0] rounded-lg text-xs bg-white outline-none focus:ring-1 focus:ring-[#3b82f6]"
+                      />
+                      <div className="w-3 shrink-0 border-t border-dashed border-[#cbd5e1]" />
+                      <input
+                        type="text"
+                        value={ev.content}
+                        onChange={e => updateEvent(index, 'content', e.target.value)}
+                        maxLength={200}
+                        className="flex-1 min-w-0 px-3 py-1.5 border border-[#e2e8f0] rounded-lg text-xs bg-white outline-none focus:ring-1 focus:ring-[#3b82f6]"
+                        placeholder="记录执行情况，如：完成50%用例，发现2个Bug..."
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeEvent(index)}
+                        className="shrink-0 p-1 text-[#cbd5e1] hover:text-[#dc2626] opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
+                  {hasMoreEvents && !eventsExpanded && (
+                    <button
+                      type="button"
+                      onClick={() => setEventsExpanded(true)}
+                      className="w-full text-center text-xs text-[#3b82f6] hover:text-[#1e40af] py-1"
+                    >
+                      查看全部 {form.events.length} 条记录
+                    </button>
+                  )}
+                  {eventsExpanded && hasMoreEvents && form.events.length > 3 && (
+                    <button
+                      type="button"
+                      onClick={() => setEventsExpanded(false)}
+                      className="w-full text-center text-xs text-[#94a3b8] hover:text-[#64748b] py-1"
+                    >
+                      收起
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {showResult && (
+            <div className="border border-[#a7f3d0] rounded-xl p-4 bg-[#ecfdf5]">
+              <label className="flex items-center gap-2 text-sm font-semibold text-[#065f46] mb-2">
+                <CheckCircle2 size={16} className="text-[#10b981]" />
+                完成结果
+              </label>
+              <input
+                ref={resultInputRef}
+                type="text"
+                value={form.result}
+                onChange={e => setForm(f => ({ ...f, result: e.target.value }))}
+                maxLength={200}
+                className="w-full px-4 py-2.5 border border-[#a7f3d0] rounded-xl focus:ring-2 focus:ring-[#10b981] focus:border-[#10b981] outline-none text-sm bg-white"
+                placeholder="简述完成成果，如：发现3个严重Bug，修复率75%，版本已发布"
+              />
+              <p className="mt-1.5 text-[11px] text-[#6b7280]">用于日报/周报的STAR结果描述</p>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-semibold text-[#475569] mb-1.5">标签</label>

@@ -1,11 +1,11 @@
-# WorkFlow Web App
+# Clarify Web App
 
 工作汇报管理系统 Web 版本，基于 React + Vite + Express 构建。
 
 ## 架构
 
 ```
-app/
+web-app/
 ├── src/                       # 前端（React + Vite）
 │   ├── api/index.ts           # API 调用封装（fetch + SSE 流式）
 │   ├── components/            # 通用组件

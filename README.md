@@ -1,4 +1,4 @@
-# WorkFlow - 工作汇报管理系统
+# Clarify - 工作汇报管理系统
 
 基于 **GTD + STAR + PDCA** 混合框架的日循环工作管理系统，专为迭代任务驱动+随机任务混合型岗位设计。
 
@@ -37,11 +37,11 @@ work-report/
 │       ├── utils/             # 工具函数
 │       ├── App.tsx            # 统一路由
 │       └── index.css          # 全局样式
-├── app/                       # Web 版本（React + Vite + Express）
+├── web-app/                    # Web 版本（React + Vite + Express）
 │   ├── src/main.tsx           # 入口文件
 │   ├── server/                # Express 后端服务
 │   └── app-data/              # 运行时数据（已 gitignore）
-├── workflow-app/              # 桌面版（React + Vite + Tauri）
+├── desktop-app/                # 桌面版（React + Vite + Tauri）
 │   ├── src/main.tsx           # 入口文件
 │   └── src-tauri/             # Tauri/Rust 后端
 ├── work-report-generator/     # AI Agent Skill（报告生成工作流）
@@ -64,7 +64,7 @@ Web 和桌面应用共享同一套前端源码（`shared/src/`），各应用仅
 
 ## 技术栈
 
-| 层级 | Web 版 (app) | 桌面版 (workflow-app) |
+| 层级 | Web 版 (web-app) | 桌面版 (desktop-app) |
 |------|-------------|----------------------|
 | 前端框架 | React 19 + TypeScript | React 19 + TypeScript |
 | 共享源码 | `shared/src/`（Vite alias `@shared`） | 同左 |
@@ -88,7 +88,7 @@ npm install
 ### Web 版
 
 ```bash
-cd app
+cd web-app
 npm install
 npm run dev
 ```
@@ -98,7 +98,7 @@ npm run dev
 ### 桌面版
 
 ```bash
-cd workflow-app
+cd desktop-app
 npm install
 npm run dev
 ```

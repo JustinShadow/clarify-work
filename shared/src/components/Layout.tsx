@@ -23,7 +23,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
                   <LayoutDashboard size={18} className="text-white" />
                 </div>
-                <span className="text-lg font-bold tracking-tight">WorkFlow</span>
+                <span className="text-lg font-bold tracking-tight">Clarify Work</span>
               </Link>
               
               <div className="flex gap-1">

@@ -2,7 +2,7 @@
 
 ## 核心变更：单一前端源码 + 运行时平台检测
 
-将 `app/src/` 和 `workflow-app/src/` 中的重复前端代码统一到 `shared/src/`，两个应用仅保留 `main.tsx` 入口文件。
+将 `web-app/src/` 和 `workflow-web-app/src/` 中的重复前端代码统一到 `shared/src/`，两个应用仅保留 `main.tsx` 入口文件。
 
 ## 目录结构
 
@@ -27,11 +27,11 @@ work-report/
         markdown.tsx
       App.tsx               ← 统一路由
       index.css             ← 全局样式（不含 @import "tailwindcss"）
-  app/
+  web-app/
     src/main.tsx            ← 入口：import 'tailwindcss' + initAPI() + App
     server/                 ← Express 后端
     vite.config.ts          ← Vite alias + proxy + external @tauri-apps/api/core
-  workflow-app/
+  workflow-web-app/
     src/main.tsx            ← 入口：import 'tailwindcss' + initAPI() + App
     src-tauri/              ← Rust 后端
     vite.config.ts          ← Vite alias + Tauri 配置
@@ -83,9 +83,9 @@ export const llmApi = createNamespaceProxy('llm')
 | `COLOR_CONSISTENCY.md` | 已被 DESIGN_GUIDELINE.md 覆盖 |
 | `COLOR_UNIFIED.md` | 已被 DESIGN_GUIDELINE.md 覆盖 |
 | `color-update-preview.html` | 过时预览文件 |
-| `app/src/` 下的组件/页面/类型/工具/API | 已迁移到 shared/src/ |
-| `workflow-app/src/` 下的组件/页面/类型/工具/API | 已迁移到 shared/src/ |
-| `workflow-app/src/assets/` | 未使用的 Tauri 模板资源 |
+| `web-app/src/` 下的组件/页面/类型/工具/API | 已迁移到 shared/src/ |
+| `workflow-web-app/src/` 下的组件/页面/类型/工具/API | 已迁移到 shared/src/ |
+| `workflow-web-app/src/assets/` | 未使用的 Tauri 模板资源 |
 | `MorningPlanDemo.tsx` | 临时设计验证页面 |
 | `shared/` 旧顶层结构（api/, components/, types/, utils/, index.ts） | 已迁移到 shared/src/ |
 
@@ -101,13 +101,13 @@ export const llmApi = createNamespaceProxy('llm')
 
 ```bash
 # Web 应用
-cd app && npm run build      # ✅
+cd web-app && npm run build      # ✅
 
 # 桌面应用
-cd workflow-app && npm run build  # ✅
+cd workflow-web-app && npm run build  # ✅
 
 # Rust 后端
-cd workflow-app/src-tauri && cargo check  # ✅
+cd workflow-web-app/src-tauri && cargo check  # ✅
 ```
 
 ## 效果

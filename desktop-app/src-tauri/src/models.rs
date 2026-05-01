@@ -2,6 +2,13 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct TaskEvent {
+    pub date: String,
+    pub content: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Task {
     pub id: String,
     pub title: String,
@@ -19,6 +26,10 @@ pub struct Task {
     pub updated_at: String,
     pub completed_at: Option<String>,
     pub tags: Vec<String>,
+    #[serde(default)]
+    pub events: Vec<TaskEvent>,
+    #[serde(default)]
+    pub result: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -36,6 +47,8 @@ pub struct TaskInput {
     pub estimated_minutes: Option<i32>,
     pub deadline: Option<Option<String>>,
     pub tags: Option<Vec<String>>,
+    pub events: Option<Vec<serde_json::Value>>,
+    pub result: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -5,10 +5,10 @@
 This is a dual-platform work report management app (Web + Desktop) sharing a single frontend codebase.
 
 - **`shared/src/`** is the sole source of truth for all frontend code. Every component, page, type, and API call lives here.
-- **`app/`** (Web) and **`workflow-app/`** (Desktop/Tauri) are thin shells — each contains only `main.tsx`, `index.css`, and a Vite config.
+- **`web-app/`** (Web) and **`desktop-app/`** (Desktop/Tauri) are thin shells — each contains only `main.tsx`, `index.css`, and a Vite config.
 - The root `package.json` installs shared deps so `shared/src/` can resolve bare imports (e.g. `lucide-react`, `@tauri-apps/api`).
 
-**Never duplicate code between `app/` and `workflow-app/`** — edit `shared/src/` only.
+**Never duplicate code between `web-app/` and `desktop-app/`** — edit `shared/src/` only.
 
 ## Key Design Patterns
 
@@ -24,32 +24,32 @@ This is a dual-platform work report management app (Web + Desktop) sharing a sin
 npm install
 
 # Web app (client on :5173, Express server on :3001)
-cd app && npm install && npm run dev
+cd web-app && npm install && npm run dev
 
 # Desktop app (requires Rust + Tauri CLI)
-cd workflow-app && npm install && npm run dev
+cd desktop-app && npm install && npm run dev
 
 # Build
-cd app && npm run build
-cd workflow-app && npm run build
+cd web-app && npm run build
+cd desktop-app && npm run build
 
 # Lint (per app, no root-level lint)
-cd app && npm run lint
-cd workflow-app && npm run lint
+cd web-app && npm run lint
+cd desktop-app && npm run lint
 ```
 
 No `tsc` typecheck step — `tsc -b` was removed from build scripts because `shared/` sits outside each project and tsc can't resolve cross-project modules. Vite handles this correctly via the alias.
 
 ## Testing
 
-No test framework is configured. `playwright` is listed as a dependency in `app/package.json` but no test files exist yet.
+No test framework is configured. `playwright` is listed as a dependency in `web-app/package.json` but no test files exist yet.
 
 ## Server
 
-- Express 5 backend at `app/server/index.js` (CommonJS, port 3001)
-- Server has its own `package.json` and `node_modules` inside `app/server/`
+- Express 5 backend at `web-app/server/index.js` (CommonJS, port 3001)
+- Server has its own `package.json` and `node_modules` inside `web-app/server/`
 - Dev mode starts both client and server via `npm-run-all2`: `run-p dev:client dev:server`
-- Data stored as JSON files in `app/app-data/` (gitignored, contains API keys)
+- Data stored as JSON files in `web-app/app-data/` (gitignored, contains API keys)
 - Markdown reports written to `reports/` at repo root (gitignored)
 
 ## Shared Prompts & Templates
@@ -58,8 +58,8 @@ No test framework is configured. `playwright` is listed as a dependency in `app/
 
 - **`shared/prompts/`**: Plain `.txt` files, one per prompt type (morning-plan, daily-report, weekly-report, monthly-report, test)
 - **`shared/templates/`**: `.json` files defining markdown report structure (section headings, table columns, empty row placeholders, labels)
-- **Web backend** (`app/server/index.js`): Reads files at runtime via `fs.readFileSync()` using `loadPrompt()` and `loadTemplate()`
-- **Tauri backend** (`workflow-app/src-tauri/src/commands/`): Embeds at compile time via `include_str!()` macro
+- **Web backend** (`web-app/server/index.js`): Reads files at runtime via `fs.readFileSync()` using `loadPrompt()` and `loadTemplate()`
+- **Tauri backend** (`desktop-app/src-tauri/src/commands/`): Embeds at compile time via `include_str!()` macro
 
 **To modify a prompt or report structure, edit `shared/prompts/` or `shared/templates/` only — both backends will pick up the change automatically.**
 
@@ -80,6 +80,6 @@ See `DESIGN_GUIDELINE.md` for the full "专注流" (Focus Flow) spec. Key constr
 ## Gotchas
 
 - `shared/pages/` (empty) is a leftover from the v2.0 refactor — the real pages are in `shared/src/pages/`.
-- `app/app-data/` contains `llm-config.json` with API keys — never commit or log.
+- `web-app/app-data/` contains `llm-config.json` with API keys — never commit or log.
 - The Express server imports `openai` dynamically (`await import('openai')`) to support streaming SSE responses.
 - Web build must externalize `@tauri-apps/api/core` or it will fail at build time.

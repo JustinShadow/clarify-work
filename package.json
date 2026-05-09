@@ -1,7 +1,7 @@
 {
-  "name": "work-report",
-  "private": true,
-  "description": "Root package for shared node_modules resolution",
+  "name": "clarify-work",
+  "license": "MIT",
+  "description": "Daily-cycle work management system based on GTD + STAR + PDCA hybrid framework",
   "dependencies": {
     "@tailwindcss/vite": "^4.2.4",
     "@tauri-apps/api": "^2.10.1",

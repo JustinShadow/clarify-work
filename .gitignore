@@ -38,5 +38,9 @@ web-app/server/data/llm-config.json
 # AI agent config
 AGENTS.md
 
+# AI Agent skill (private tool, not part of open-source project)
+work-report-generator.skill
+work-report-generator/
+
 # OS
 Thumbs.db

@@ -1,91 +1,76 @@
-# Clarify - 工作汇报管理系统
+# Clarify Work
 
-基于 **GTD + STAR + PDCA** 混合框架的日循环工作管理系统，专为迭代任务驱动+随机任务混合型岗位设计。
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+[![Version](https://img.shields.io/badge/version-2.1.0-blue)](./package.json)
+[![Platform](https://img.shields.io/badge/platform-Web%20%7C%20Desktop-1E3A5F)](./)
 
-## 功能概览
+**Daily-cycle work management system** based on **GTD + STAR + PDCA** hybrid framework. Built for roles with iterative task-driven + ad-hoc task mix (e.g., software testing, project management).
 
-| 功能 | 说明 | 框架 |
-|------|------|------|
-| 看板管理 | 主线/支线任务看板，优先级排序，拖拽管理 | GTD |
-| 晨间规划 | 自动继承昨日遗留，AI 辅助生成今日安排 | GTD |
-| 日报 | 记录执行过程 + PDCA 复盘，AI 辅助生成 | GTD + PDCA |
-| 周报 | 汇总一周日报，STAR 成果展现，PDCA 周度复盘 | PDCA + STAR |
-| 月报 | 汇总月度周报，按迭代版本分组，向上汇报工作价值 | STAR |
-| AI 辅助 | 接入 OpenAI 兼容 API，流式生成报告内容 | - |
+Designed around a **daily loop**: morning planning inherits yesterday's leftovers, evening reports capture outcomes, and weekly/monthly reports aggregate upward — forming a closed feedback loop.
 
-## 日循环
+> 🌊 「专注流」Design System — Deep sea blue primary color, warm priority gradient, built for long-hour productivity use.
+
+---
+
+## Why Clarify Work?
+
+### A Proven Methodology, Not Just a Todo App
+
+Traditional todo apps treat tasks in isolation. Clarify Work implements a **daily cycle** rooted in three established frameworks:
+
+- **GTD** (Getting Things Done) — Capture, clarify, organize tasks with priority-driven kanban
+- **STAR** (Situation-Task-Action-Result) — Structure weekly/monthly reports around measurable outcomes
+- **PDCA** (Plan-Do-Check-Act) — Continuous improvement loop at daily and weekly granularity
+
+### One Codebase, Two Platforms
+
+Shared frontend source in `shared/src/` — modify once, both Web and Desktop apps update automatically. Runtime `isTauri` detection switches API adapters transparently.
+
+---
+
+## Features
+
+| Feature | Description | Framework |
+|---------|-------------|-----------|
+| **Kanban Board** | Main/side task boards with priority sorting & drag management | GTD |
+| **Morning Plan** | Auto-inherits yesterday's leftovers, AI-assisted daily arrangement | GTD |
+| **Daily Report** | Record execution process + PDCA review, AI-assisted generation | GTD + PDCA |
+| **Weekly Report** | Aggregate daily reports, STAR outcome presentation, PDCA weekly review | PDCA + STAR |
+| **Monthly Report** | Aggregate weekly reports, group by iteration version, upward reporting | STAR |
+| **AI Assistant** | OpenAI-compatible API integration, streaming report generation | — |
+
+## Daily Loop
 
 ```
-昨日日报 ──→ 晨间规划 ──→ 日间执行 ──→ 晚间日报 ──→ 明日晨间规划
-（遗留任务） （今日安排）  （按规划执行） （成果记录）   （闭环）
+Yesterday's Report ──→ Morning Plan ──→ Daily Execution ──→ Evening Report ──→ Tomorrow's Plan
+   (leftover tasks)    (today's plan)    (execute per plan)   (outcome record)     (closed loop)
 ```
 
-## 项目结构
+**Data flows across levels:**
 
 ```
-work-report/
-├── shared/                    # 共享前端源码（真相源）
-│   └── src/
-│       ├── api/               # API 调用层（运行时自动选择适配器）
-│       │   ├── index.ts       # 命名空间 Proxy 导出 + 动态加载
-│       │   ├── types.ts       # API 接口定义
-│       │   ├── web-adapter.ts # HTTP fetch 实现
-│       │   └── tauri-adapter.ts # Tauri invoke 实现
-│       ├── components/        # 通用组件（9个）
-│       ├── pages/             # 页面组件（6个）
-│       ├── types/             # TypeScript 类型定义 + Tauri API stub
-│       ├── utils/             # 工具函数
-│       ├── App.tsx            # 统一路由
-│       └── index.css          # 全局样式
-├── web-app/                    # Web 版本（React + Vite + Express）
-│   ├── src/main.tsx           # 入口文件
-│   ├── server/                # Express 后端服务
-│   └── app-data/              # 运行时数据（已 gitignore）
-├── desktop-app/                # 桌面版（React + Vite + Tauri）
-│   ├── src/main.tsx           # 入口文件
-│   └── src-tauri/             # Tauri/Rust 后端
-├── work-report-generator/     # AI Agent Skill（报告生成工作流）
-│   ├── SKILL.md               # Skill 定义
-│   ├── assets/                # 报告模板
-│   └── references/            # 框架参考文档
-├── reports/                   # 生成的 Markdown 报告文件
-├── DESIGN_GUIDELINE.md        # 「专注流」前端设计规范
-└── package.json               # 根级依赖（shared node_modules 解析）
+Daily Done      → Weekly STAR achievements
+Daily Waiting   → Weekly blocker tracking
+Daily Check/Act → Weekly PDCA review
+Weekly STAR     → Monthly iteration grouping
+Weekly Stats    → Monthly trend analysis
+Monthly Act     → Next month's morning plan (loop closed)
 ```
 
-### 架构说明
+---
 
-Web 和桌面应用共享同一套前端源码（`shared/src/`），各应用仅保留 `main.tsx` 入口文件。API 层通过运行时 `isTauri` 检测自动选择适配器：
+## Quick Start
 
-- **Web**：`web-adapter.ts` → HTTP fetch 到 Express 后端
-- **桌面**：`tauri-adapter.ts` → Tauri invoke 调用 Rust 后端
+### Prerequisites
 
-修改任何页面/组件只需改 `shared/src/` 中一处，两个应用自动生效。
-
-## 技术栈
-
-| 层级 | Web 版 (web-app) | 桌面版 (desktop-app) |
-|------|-------------|----------------------|
-| 前端框架 | React 19 + TypeScript | React 19 + TypeScript |
-| 共享源码 | `shared/src/`（Vite alias `@shared`） | 同左 |
-| 构建工具 | Vite 8 | Vite 8 |
-| CSS 方案 | Tailwind CSS 4 | Tailwind CSS 4 |
-| 图标库 | Lucide React | Lucide React |
-| 路由 | React Router DOM 7 | React Router DOM 7 |
-| 后端 | Express 5 + Node.js | Tauri 2 + Rust |
-| AI 接口 | OpenAI SDK（流式） | 同 Web 版 API |
-| 数据存储 | JSON 文件 | JSON 文件 |
-
-## 快速开始
-
-### 前置条件
+- [Node.js](https://nodejs.org/) 18+
+- Install root dependencies first (required for `shared/` module resolution):
 
 ```bash
-# 安装根级依赖（供 shared/src/ 模块解析）
 npm install
 ```
 
-### Web 版
+### Web App
 
 ```bash
 cd web-app
@@ -93,9 +78,9 @@ npm install
 npm run dev
 ```
 
-启动后访问 http://localhost:5173，后端 API 服务自动在 http://localhost:3001 启动。
+Frontend: http://localhost:5173 | Backend API: http://localhost:3001
 
-### 桌面版
+### Desktop App (requires Rust + Tauri CLI)
 
 ```bash
 cd desktop-app
@@ -103,77 +88,135 @@ npm install
 npm run dev
 ```
 
-需要安装 [Rust](https://www.rust-lang.org/tools/install) 和 Tauri CLI。
+See [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) for setup.
 
-## 配置 AI 服务
+### Configure AI Service
 
-1. 启动应用后进入 **设置** 页面
-2. 填写 API 配置：
-   - **Provider**: OpenAI 兼容接口
-   - **API Key**: 你的密钥
-   - **Base URL**: API 地址（默认 `https://api.openai.com/v1`）
-   - **Model**: 模型名称（默认 `gpt-4o-mini`）
-3. 点击 **测试连接** 验证配置
+1. Open the app → **Settings** page
+2. Fill in API config:
+   - **Provider**: OpenAI-compatible endpoint
+   - **API Key**: Your key
+   - **Base URL**: API address (default `https://api.openai.com/v1`)
+   - **Model**: Model name (default `gpt-4o-mini`)
+3. Click **Test Connection** to verify
 
-## 报告目录结构
+---
+
+## Tech Stack
+
+| Layer | Web App | Desktop App |
+|-------|---------|-------------|
+| Frontend | React 19 + TypeScript | React 19 + TypeScript |
+| Shared Source | `shared/src/` (Vite alias `@shared`) | Same |
+| Build | Vite 8 | Vite 8 |
+| CSS | Tailwind CSS 4 | Tailwind CSS 4 |
+| Icons | Lucide React | Lucide React |
+| Routing | React Router DOM 7 | React Router DOM 7 |
+| Backend | Express 5 + Node.js | Tauri 2 + Rust |
+| AI | OpenAI SDK (streaming) | Same API |
+| Storage | JSON files | JSON files |
+
+---
+
+## Project Structure
+
+```
+clarify-work/
+├── shared/                     # Single source of truth for all frontend code
+│   ├── src/
+│   │   ├── api/                # API layer (runtime adapter switching)
+│   │   │   ├── index.ts        # Namespace Proxy export + dynamic loading
+│   │   │   ├── types.ts        # API interface definitions
+│   │   │   ├── web-adapter.ts  # HTTP fetch implementation
+│   │   │   └── tauri-adapter.ts# Tauri invoke() implementation
+│   │   ├── components/         # Shared components
+│   │   ├── pages/              # Page components
+│   │   ├── types/              # TypeScript types + Tauri API stub
+│   │   ├── utils/              # Utility functions
+│   │   ├── prompts/            # LLM system prompts (shared)
+│   │   ├── templates/          # Report templates (shared)
+│   │   ├── App.tsx             # Unified router
+│   │   └── index.css           # Global styles
+│   └── prompts/                # Prompt source files (.txt)
+│   └── templates/              # Template source files (.json)
+├── web-app/                    # Web shell (React + Vite + Express)
+│   ├── src/main.tsx            # Entry point
+│   ├── server/                 # Express backend
+│   └── vite.config.ts          # Vite alias + proxy
+├── desktop-app/                # Desktop shell (React + Vite + Tauri)
+│   ├── src/main.tsx            # Entry point
+│   └── src-tauri/              # Tauri/Rust backend
+├── docs/                       # Documentation
+│   ├── DESIGN_GUIDELINE.md     # 「专注流」 design specification
+│   └── color-palette-showcase.html  # Color palette visualization
+├── LICENSE                     # MIT License
+└── package.json                # Root dependencies (shared module resolution)
+```
+
+### Architecture Highlights
+
+- **API adapter switching**: `shared/src/api/index.ts` detects `isTauri` at runtime to dynamically load `web-adapter.ts` or `tauri-adapter.ts`. Call `initAPI()` before any API usage (done in `main.tsx`).
+- **Tailwind CSS split**: `@import "tailwindcss"` lives in each app's `index.css`, not in `shared/`. The `@source` directive points Vite at `shared/src/**/*.{ts,tsx}` for class scanning.
+- **Tauri stub**: `shared/src/types/tauri-api-stub.d.ts` provides `@tauri-apps/api/core` types without requiring the package. Web build externalizes it via `rollupOptions.external`.
+
+---
+
+## Design System
+
+The 「专注流」(Focus Flow) design system is built for long-hour productivity use:
+
+- **Primary**: `#1E3A5F` (deep sea blue) — nav bar, primary buttons
+- **Priority gradient**: P0 `#DC2626` → P1 `#EA580C` → P2 `#EAB308` → P3 `#9CA3AF`
+- **Functional colors**: Success `#10B981` / Warning `#F97316` / Danger `#EF4444` / Info `#3B82F6`
+- **No purple** — all former purple usages replaced with `#3B82F6` or `#1E3A5F`
+
+Full specification: [docs/DESIGN_GUIDELINE.md](./docs/DESIGN_GUIDELINE.md)
+Color palette preview: [docs/color-palette-showcase.html](./docs/color-palette-showcase.html)
+
+---
+
+## Contributing
+
+Contributions are welcome! Here's how to get started:
+
+1. **Fork** the repository
+2. Create a **feature branch**: `git checkout -b feature/your-feature`
+3. Make your changes in `shared/src/` (both platforms update automatically)
+4. Follow the design system in [docs/DESIGN_GUIDELINE.md](./docs/DESIGN_GUIDELINE.md)
+5. **Test** both platforms: `cd web-app && npm run dev` and `cd desktop-app && npm run dev`
+6. Submit a **Pull Request**
+
+### Code Conventions
+
+- All frontend code lives in `shared/src/` — never duplicate between `web-app/` and `desktop-app/`
+- Use hex colors or Tailwind arbitrary values (e.g. `bg-[#1e3a5f]`), not Tailwind named colors
+- Icons: Lucide React only. AI buttons use `Sparkles`
+- No test framework is configured yet — manual testing on both platforms is appreciated
+
+---
+
+## Report Directory Structure
+
+Generated reports are saved as Markdown files:
 
 ```
 reports/YYYY/MM/
 ├── daily/
-│   ├── YYYY-MM-DD-plan.md    # 晨间规划
-│   └── YYYY-MM-DD.md         # 日报
+│   ├── YYYY-MM-DD-plan.md    # Morning plan
+│   └── YYYY-MM-DD.md         # Daily report
 ├── weekly/
-│   └── YYYY-MM-DD.md         # 周报
-└── YYYY-MM.md                 # 月报
+│   └── YYYY-MM-DD.md         # Weekly report
+└── YYYY-MM.md                 # Monthly report
 ```
 
-## API 接口
+---
 
-后端服务端口：`3001`
+## License
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/api/tasks` | 获取所有任务 |
-| POST | `/api/tasks` | 创建任务 |
-| PUT | `/api/tasks/:id` | 更新任务 |
-| DELETE | `/api/tasks/:id` | 删除任务 |
-| GET | `/api/tags` | 获取标签 |
-| GET | `/api/stats` | 获取统计数据 |
-| GET | `/api/llm/config` | 获取 LLM 配置 |
-| PUT | `/api/llm/config` | 更新 LLM 配置 |
-| POST | `/api/llm/test` | 测试 LLM 连接 |
-| POST | `/api/llm/generate-morning-plan` | AI 生成晨间规划（SSE） |
-| POST | `/api/llm/generate-daily` | AI 生成日报（SSE） |
-| POST | `/api/llm/generate-weekly` | AI 生成周报（SSE） |
-| POST | `/api/llm/generate-monthly` | AI 生成月报（SSE） |
-| GET/POST/PUT/DELETE | `/api/reports/daily/*` | 日报 CRUD |
-| GET/POST/DELETE | `/api/reports/weekly/*` | 周报 CRUD |
-| GET/POST/DELETE | `/api/reports/monthly/*` | 月报 CRUD |
-| GET/POST/PUT | `/api/reports/morning-plan/*` | 晨间规划 CRUD |
+This project is licensed under the [MIT License](./LICENSE).
 
-## 设计规范
+---
 
-详见 [DESIGN_GUIDELINE.md](./DESIGN_GUIDELINE.md)，包含：
-
-- 「专注流」配色方案（深海蓝主调 + 优先级暖色渐变）
-- 组件规范（按钮、卡片、进度条、弹窗、输入框、标签）
-- 页面布局（导航栏、页面头部、主题色分配）
-- 文字排版、图标规范、响应式设计、动画过渡
-
-配色可视化预览：[color-palette-showcase.html](./color-palette-showcase.html)
-
-## 数据流转
-
-```
-昨日日报未完成    → 今日晨间规划待续
-昨日日报 Waiting  → 今日晨间规划跟进
-昨日日报明日计划  → 今日晨间规划继承
-晨间规划工作安排  → 今日日报 Next Actions
-晨间规划新增任务  → 今日日报 Inbox
-日报 Done         → 周报 STAR 成果
-日报 Waiting      → 周报阻塞跟踪
-日报 Check/Act    → 周报 PDCA 复盘
-周报 STAR         → 月报按迭代分组
-周报统计          → 月报趋势分析
-月报 Act          → 下月晨间规划（闭环）
-```
+<p align="center">
+  Built with ❤️ using React, Tauri, and the GTD + STAR + PDCA framework
+</p>

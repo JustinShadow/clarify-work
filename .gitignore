@@ -4,6 +4,7 @@ node_modules/
 # Build output
 dist/
 dist-ssr/
+desktop-app/linux-dist/
 
 # Logs
 *.log
@@ -33,6 +34,9 @@ web-app/app-data/
 
 # Legacy data dir (pre-v0.3.0)
 web-app/server/data/llm-config.json
+
+# AI agent config
+AGENTS.md
 
 # OS
 Thumbs.db

@@ -116,11 +116,11 @@ export function getWeekRange(): { start: string; end: string } {
   const mondayOffset = day === 0 ? -6 : 1 - day
   const monday = new Date(now)
   monday.setDate(now.getDate() + mondayOffset)
-  const friday = new Date(monday)
-  friday.setDate(monday.getDate() + 4)
+  const sunday = new Date(monday)
+  sunday.setDate(monday.getDate() + 6)
   return {
     start: formatDateStr(monday),
-    end: formatDateStr(friday),
+    end: formatDateStr(sunday),
   }
 }
 

@@ -5,6 +5,19 @@ use crate::models::*;
 use crate::AppData;
 use crate::commands::tasks;
 
+fn get_week_month(week_start: &str, week_end: &str) -> String {
+    let start = chrono::NaiveDate::parse_from_str(week_start, "%Y-%m-%d").unwrap();
+    let end = chrono::NaiveDate::parse_from_str(week_end, "%Y-%m-%d").unwrap();
+    let mut counts: std::collections::HashMap<String, i32> = std::collections::HashMap::new();
+    let mut d = start;
+    while d <= end {
+        let m = d.format("%Y-%m").to_string();
+        *counts.entry(m).or_insert(0) += 1;
+        d += chrono::Duration::days(1);
+    }
+    counts.into_iter().max_by_key(|(_, c)| *c).map(|(m, _)| m).unwrap_or_default()
+}
+
 #[derive(serde::Deserialize)]
 struct ReportTemplate {
     title: String,
@@ -1039,7 +1052,7 @@ pub fn generate_monthly_report(state: State<AppData>, input: MonthlyReportInput)
     let mut weekly_reports = vec![];
     for entry in entries.flatten() {
         if let Some(report) = read_json_file::<WeeklyReport>(&entry.path()) {
-            if report.week_start.starts_with(&input.month) {
+            if get_week_month(&report.week_start, &report.week_end) == input.month {
                 weekly_reports.push(report);
             }
         }

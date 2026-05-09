@@ -3,6 +3,19 @@ use tauri::{State, ipc::Channel};
 use crate::models::{LLMConfig, LLMConfigInput, StreamEvent};
 use crate::AppData;
 
+fn get_week_month(week_start: &str, week_end: &str) -> String {
+    let start = chrono::NaiveDate::parse_from_str(week_start, "%Y-%m-%d").unwrap();
+    let end = chrono::NaiveDate::parse_from_str(week_end, "%Y-%m-%d").unwrap();
+    let mut counts: std::collections::HashMap<String, i32> = std::collections::HashMap::new();
+    let mut d = start;
+    while d <= end {
+        let m = d.format("%Y-%m").to_string();
+        *counts.entry(m).or_insert(0) += 1;
+        d += chrono::Duration::days(1);
+    }
+    counts.into_iter().max_by_key(|(_, c)| *c).map(|(m, _)| m).unwrap_or_default()
+}
+
 fn llm_config_path(state: &AppData) -> std::path::PathBuf {
     state.config_dir.join("llm-config.json")
 }
@@ -412,7 +425,7 @@ fn build_context(state: &AppData, endpoint: &str, body: &serde_json::Value) -> R
             if let Ok(entries) = fs::read_dir(&weekly_dir) {
                 for entry in entries.flatten() {
                     if let Some(report) = read_json_file::<crate::models::WeeklyReport>(&entry.path()) {
-                        if report.week_start.starts_with(&month) {
+                        if get_week_month(&report.week_start, &report.week_end) == month {
                             let stars: Vec<serde_json::Value> = report.star_achievements.iter().map(|s| serde_json::json!({
                                 "title": s.title, "situation": s.situation, "task": s.task, "action": s.action, "result": s.result,
                             })).collect();

@@ -7,6 +7,17 @@ const { v4: uuidv4 } = require('uuid')
 const app = express()
 const PORT = 3001
 
+function getWeekMonth(weekStart, weekEnd) {
+  const start = new Date(weekStart)
+  const end = new Date(weekEnd)
+  const counts = {}
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const m = d.toISOString().slice(0, 7)
+    counts[m] = (counts[m] || 0) + 1
+  }
+  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0]
+}
+
 app.use(cors())
 app.use(express.json({ charset: 'utf-8', limit: '10mb' }))
 app.use((req, res, next) => {
@@ -825,7 +836,7 @@ app.post('/api/reports/monthly/generate', (req, res) => {
   const weeklyReports = []
   weeklyFiles.forEach(f => {
     const report = JSON.parse(fs.readFileSync(path.join(weeklyDir, f), 'utf-8'))
-    if (report.weekStart.startsWith(month)) weeklyReports.push(report)
+    if (getWeekMonth(report.weekStart, report.weekEnd) === month) weeklyReports.push(report)
   })
 
   const allHighlights = weeklyReports.flatMap(r => r.highlights || [])
@@ -1250,7 +1261,7 @@ app.post('/api/llm/generate-monthly', async (req, res) => {
   const weeklyReports = []
   weeklyFiles.forEach(f => {
     const report = JSON.parse(fs.readFileSync(path.join(weeklyDir, f), 'utf-8'))
-    if (report.weekStart.startsWith(month)) weeklyReports.push(report)
+    if (getWeekMonth(report.weekStart, report.weekEnd) === month) weeklyReports.push(report)
   })
 
   const contextData = {

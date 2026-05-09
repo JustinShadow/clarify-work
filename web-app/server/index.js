@@ -1088,16 +1088,19 @@ app.post('/api/llm/generate-morning-plan', async (req, res) => {
       tomorrowPlan: yesterdayReport.tomorrowPlan || [],
       deviationAnalysis: yesterdayReport.deviationAnalysis || '',
       improvementMeasures: yesterdayReport.improvementMeasures || '',
+      llmContent: yesterdayReport.llmContent || '',
+      notes: yesterdayReport.notes || '',
+      focusScore: yesterdayReport.focusScore,
     } : null,
     currentTasks: {
       inProgress: inProgress.map(taskToContext),
       todo: todo.map(taskToContext),
       blocked: blocked.map(taskToContext),
     },
-    userInput: req.body.userInput || '',
   }
 
   const systemPrompt = loadPrompt('morning-plan')
+  const chatHistory = req.body.chatHistory || []
 
   res.setHeader('Content-Type', 'text/event-stream')
   res.setHeader('Cache-Control', 'no-cache')
@@ -1108,6 +1111,7 @@ app.post('/api/llm/generate-morning-plan', async (req, res) => {
       [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: JSON.stringify(contextData, null, 2) },
+        ...chatHistory,
       ],
       (chunk) => {
         res.write(`data: ${JSON.stringify({ content: chunk })}\n\n`)
@@ -1151,12 +1155,12 @@ app.post('/api/llm/generate-daily', async (req, res) => {
     inProgress: inProgress.map(taskToContext),
     todo: todo.map(taskToContext),
     blocked: blocked.map(taskToContext),
-    userInput: req.body.userInput || '',
     focusScore: req.body.focusScore,
     tomorrowPlan: req.body.tomorrowPlan || [],
   }
 
   const systemPrompt = loadPrompt('daily-report')
+  const chatHistory = req.body.chatHistory || []
 
   res.setHeader('Content-Type', 'text/event-stream')
   res.setHeader('Cache-Control', 'no-cache')
@@ -1167,6 +1171,7 @@ app.post('/api/llm/generate-daily', async (req, res) => {
       [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: JSON.stringify(contextData, null, 2) },
+        ...chatHistory,
       ],
       (chunk) => {
         res.write(`data: ${JSON.stringify({ content: chunk })}\n\n`)
@@ -1207,10 +1212,10 @@ app.post('/api/llm/generate-weekly', async (req, res) => {
       deviationAnalysis: r.deviationAnalysis || '',
       improvementMeasures: r.improvementMeasures || '',
     })),
-    userInput: req.body.userInput || '',
   }
 
   const systemPrompt = loadPrompt('weekly-report')
+  const chatHistory = req.body.chatHistory || []
 
   res.setHeader('Content-Type', 'text/event-stream')
   res.setHeader('Cache-Control', 'no-cache')
@@ -1221,6 +1226,7 @@ app.post('/api/llm/generate-weekly', async (req, res) => {
       [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: JSON.stringify(contextData, null, 2) },
+        ...chatHistory,
       ],
       (chunk) => {
         res.write(`data: ${JSON.stringify({ content: chunk })}\n\n`)
@@ -1262,10 +1268,10 @@ app.post('/api/llm/generate-monthly', async (req, res) => {
         title: s.title, situation: s.situation, task: s.task, action: s.action, result: s.result,
       })),
     })),
-    userInput: req.body.userInput || '',
   }
 
   const systemPrompt = loadPrompt('monthly-report')
+  const chatHistory = req.body.chatHistory || []
 
   res.setHeader('Content-Type', 'text/event-stream')
   res.setHeader('Cache-Control', 'no-cache')
@@ -1276,6 +1282,7 @@ app.post('/api/llm/generate-monthly', async (req, res) => {
       [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: JSON.stringify(contextData, null, 2) },
+        ...chatHistory,
       ],
       (chunk) => {
         res.write(`data: ${JSON.stringify({ content: chunk })}\n\n`)

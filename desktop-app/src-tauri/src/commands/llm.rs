@@ -139,14 +139,22 @@ pub async fn llm_stream_generate(
 
     let context_data = build_context(&state, &endpoint, &body)?;
 
+    let chat_history = body.get("chatHistory")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+
     let client = reqwest::Client::new();
     let url = format!("{}/chat/completions", config.base_url.trim_end_matches('/'));
+    let mut messages = vec![
+        serde_json::json!({"role": "system", "content": system_prompt}),
+        serde_json::json!({"role": "user", "content": serde_json::to_string_pretty(&context_data).unwrap_or_default()}),
+    ];
+    messages.extend(chat_history);
+
     let request_body = serde_json::json!({
         "model": config.model,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": serde_json::to_string_pretty(&context_data).unwrap_or_default()}
-        ],
+        "messages": messages,
         "temperature": config.temperature,
         "max_tokens": config.max_tokens,
         "stream": true,
@@ -295,6 +303,9 @@ fn build_context(state: &AppData, endpoint: &str, body: &serde_json::Value) -> R
                     "tomorrowPlan": yr.tomorrow_plan,
                     "deviationAnalysis": yr.deviation_analysis,
                     "improvementMeasures": yr.improvement_measures,
+                    "llmContent": yr.llm_content,
+                    "notes": yr.notes,
+                    "focusScore": yr.focus_score,
                 })
             });
 
@@ -306,7 +317,6 @@ fn build_context(state: &AppData, endpoint: &str, body: &serde_json::Value) -> R
                     "todo": todo,
                     "blocked": blocked,
                 },
-                "userInput": body.get("userInput").and_then(|v| v.as_str()).unwrap_or(""),
             }))
         }
         "generate-daily" => {
@@ -355,7 +365,6 @@ fn build_context(state: &AppData, endpoint: &str, body: &serde_json::Value) -> R
                 "inProgress": in_progress,
                 "todo": todo,
                 "blocked": blocked,
-                "userInput": body.get("userInput").and_then(|v| v.as_str()).unwrap_or(""),
                 "focusScore": body.get("focusScore"),
                 "tomorrowPlan": body.get("tomorrowPlan"),
             }))
@@ -393,7 +402,6 @@ fn build_context(state: &AppData, endpoint: &str, body: &serde_json::Value) -> R
                 "weekStart": week_start,
                 "weekEnd": week_end,
                 "dailyReports": daily_reports_data,
-                "userInput": body.get("userInput").and_then(|v| v.as_str()).unwrap_or(""),
             }))
         }
         "generate-monthly" => {
@@ -427,7 +435,6 @@ fn build_context(state: &AppData, endpoint: &str, body: &serde_json::Value) -> R
             Ok(serde_json::json!({
                 "month": month,
                 "weeklyReports": weekly_reports_data,
-                "userInput": body.get("userInput").and_then(|v| v.as_str()).unwrap_or(""),
             }))
         }
         _ => Err(format!("Unknown endpoint: {}", endpoint)),

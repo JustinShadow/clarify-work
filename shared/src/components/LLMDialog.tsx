@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { X, Send, Loader2, Sparkles, Bot } from 'lucide-react'
+import { X, Sparkles, Bot } from 'lucide-react'
 import { useScrollLock } from '../hooks/useScrollLock'
 
 interface Props {
@@ -18,6 +18,7 @@ export default function LLMDialog({ open, title, systemContext, onGenerate, onCl
   const [msgId, setMsgId] = useState(0)
   const [streaming, setStreaming] = useState(false)
   const [finalContent, setFinalContent] = useState('')
+  const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'assistant'; content: string }[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useScrollLock(open)
@@ -27,28 +28,35 @@ export default function LLMDialog({ open, title, systemContext, onGenerate, onCl
   }, [messages, finalContent])
 
   const handleSend = async () => {
+    if (streaming) return
     const userMsg = input.trim()
-    if (!userMsg || streaming) return
-
     setInput('')
-    const newId = msgId + 1
-    setMsgId(newId)
-    setMessages(prev => [...prev, { id: newId, role: 'user', content: userMsg }])
+
+    const newChatHistory = userMsg
+      ? [...chatHistory, { role: 'user' as const, content: userMsg }]
+      : chatHistory
+
+    if (userMsg) {
+      const newId = msgId + 1
+      setMsgId(newId)
+      setMessages(prev => [...prev, { id: newId, role: 'user', content: userMsg }])
+    }
     setStreaming(true)
     setFinalContent('')
 
     try {
-      const body = { ...streamBody, userInput: userMsg }
+      const body = { ...streamBody, chatHistory: newChatHistory }
       const result = await streamFn(body, (content) => {
         setFinalContent(content)
       })
-      const assistantId = newId + 1
+      const assistantId = msgId + (userMsg ? 2 : 1)
       setMsgId(assistantId)
       setMessages(prev => [...prev, { id: assistantId, role: 'assistant', content: result }])
+      setChatHistory([...newChatHistory, { role: 'assistant', content: result }])
       setFinalContent('')
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
-      const errId = newId + 1
+      const errId = msgId + (userMsg ? 2 : 1)
       setMsgId(errId)
       setMessages(prev => [...prev, { id: errId, role: 'assistant', content: `❌ 生成失败: ${msg}` }])
       setFinalContent('')
@@ -58,7 +66,7 @@ export default function LLMDialog({ open, title, systemContext, onGenerate, onCl
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey && input.trim()) {
       e.preventDefault()
       handleSend()
     }
@@ -105,8 +113,8 @@ export default function LLMDialog({ open, title, systemContext, onGenerate, onCl
               <div className="w-16 h-16 bg-[#eff6ff] rounded-2xl mx-auto mb-4 flex items-center justify-center">
                 <Bot size={32} className="text-[#3b82f6]" />
               </div>
-              <p className="text-sm font-medium text-[#64748b]">输入你的需求，AI将帮你生成报告内容</p>
-              <p className="text-xs mt-2 text-[#94a3b8]">例如：帮我根据今天的任务情况生成日报</p>
+              <p className="text-sm font-medium text-[#64748b]">AI将根据已有任务和报告数据生成</p>
+              <p className="text-xs mt-2 text-[#94a3b8]">你也可以补充额外信息后生成</p>
             </div>
           )}
           {messages.map((msg) => (
@@ -122,6 +130,14 @@ export default function LLMDialog({ open, title, systemContext, onGenerate, onCl
               </div>
             </div>
           ))}
+          {streaming && !finalContent && (
+            <div className="flex justify-start">
+              <div className="max-w-[85%] rounded-2xl px-4 py-3 text-sm bg-[#eff6ff] text-[#64748b] border border-[#bfdbfe] shadow-sm flex items-center gap-2">
+                <span className="inline-block w-1.5 h-4 bg-[#3b82f6] animate-pulse" />
+                正在生成...
+              </div>
+            </div>
+          )}
           {streaming && finalContent && (
             <div className="flex justify-start">
               <div className="max-w-[85%] rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap bg-[#eff6ff] text-[#1e293b] border border-[#bfdbfe] shadow-sm">
@@ -151,15 +167,15 @@ export default function LLMDialog({ open, title, systemContext, onGenerate, onCl
               onKeyDown={handleKeyDown}
               className="flex-1 px-4 py-3 border border-[#e2e8f0] rounded-xl focus:ring-2 focus:ring-[#3b82f6] focus:border-[#3b82f6] outline-none text-sm resize-none bg-[#f8fafc]"
               rows={2}
-              placeholder="描述你的需求，或补充额外信息..."
+              placeholder="补充额外信息（可选）..."
               disabled={streaming}
             />
             <button
               onClick={handleSend}
-              disabled={streaming || !input.trim()}
+              disabled={streaming}
               className="px-5 py-3 bg-[#3b82f6] text-white rounded-xl hover:bg-[#2563eb] transition text-sm font-semibold disabled:opacity-50 self-end shadow-sm flex items-center gap-2"
             >
-              {streaming ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+              <Sparkles size={16} /> 生成
             </button>
           </div>
         </div>

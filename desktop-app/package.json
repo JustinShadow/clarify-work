@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.2.4",
-    "@tauri-apps/api": "^2.10.1",
+    "@tauri-apps/api": "^2.11.0",
     "lucide-react": "^1.11.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
@@ -24,7 +24,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@tauri-apps/cli": "^2.10.1",
+    "@tauri-apps/cli": "^2.11.1",
     "@types/node": "^24.12.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",

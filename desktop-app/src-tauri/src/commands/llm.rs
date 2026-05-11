@@ -279,7 +279,7 @@ fn task_to_context(t: &crate::models::Task) -> serde_json::Value {
 
 fn build_context(state: &AppData, endpoint: &str, body: &serde_json::Value) -> Result<serde_json::Value, String> {
     use crate::commands::tasks;
-    use crate::commands::reports::{reports_dir, today, yesterday, read_json_file};
+    use crate::commands::reports::{reports_dir, today, read_json_file};
 
     let tasks = tasks::read_tasks_from_state(state);
     let today_str = today();
@@ -287,9 +287,7 @@ fn build_context(state: &AppData, endpoint: &str, body: &serde_json::Value) -> R
 
     match endpoint {
         "generate-morning-plan" => {
-            let yesterday_date = yesterday(&date);
-            let yesterday_file = reports_dir(state).join("daily").join(format!("{}.json", yesterday_date));
-            let yesterday_report = read_json_file::<crate::models::DailyReport>(&yesterday_file);
+            let ctx = crate::commands::reports::resolve_morning_context(state, &date);
 
             let in_progress: Vec<serde_json::Value> = tasks.iter()
                 .filter(|t| t.status == "in_progress")
@@ -304,7 +302,7 @@ fn build_context(state: &AppData, endpoint: &str, body: &serde_json::Value) -> R
                 .map(|t| task_to_context(t))
                 .collect();
 
-            let yesterday_data = yesterday_report.map(|yr| {
+            let yesterday_data = ctx.daily_report.as_ref().map(|yr| {
                 let completed_main: Vec<serde_json::Value> = yr.completed_main.iter().map(|t| task_to_context(t)).collect();
                 let completed_side: Vec<serde_json::Value> = yr.completed_side.iter().map(|t| task_to_context(t)).collect();
                 let in_prog: Vec<serde_json::Value> = yr.in_progress.iter().map(|t| task_to_context(t)).collect();
@@ -322,9 +320,35 @@ fn build_context(state: &AppData, endpoint: &str, body: &serde_json::Value) -> R
                 })
             });
 
+            let weekly_data = ctx.weekly_report.as_ref().map(|wr| {
+                let last_daily = wr.daily_reports.last().map(|last| {
+                    let in_prog: Vec<serde_json::Value> = last.in_progress.iter().map(|t| task_to_context(t)).collect();
+                    serde_json::json!({
+                        "date": last.date,
+                        "tomorrowPlan": last.tomorrow_plan,
+                        "inProgress": in_prog,
+                        "blockers": last.blockers,
+                    })
+                });
+                serde_json::json!({
+                    "weekStart": wr.week_start,
+                    "weekEnd": wr.week_end,
+                    "nextWeekPlan": wr.next_week_plan,
+                    "improvementMeasures": wr.improvement_measures,
+                    "deviationAnalysis": wr.deviation_analysis,
+                    "issues": wr.issues,
+                    "highlights": wr.highlights,
+                    "avgFocusScore": wr.avg_focus_score,
+                    "lastDailyReport": last_daily,
+                })
+            });
+
             Ok(serde_json::json!({
                 "date": date,
+                "contextMode": ctx.mode,
+                "contextStalenessDays": ctx.staleness_days,
                 "yesterdayReport": yesterday_data,
+                "weeklyReport": weekly_data,
                 "currentTasks": {
                     "inProgress": in_progress,
                     "todo": todo,

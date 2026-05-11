@@ -125,6 +125,142 @@ function getYesterday(dateStr) {
   return `${y}-${m}-${day}`
 }
 
+function formatDateStr(d) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+function getWeekStart(dateStr) {
+  const d = new Date(dateStr)
+  const day = d.getDay()
+  const mondayOffset = day === 0 ? -6 : 1 - day
+  const monday = new Date(d)
+  monday.setDate(d.getDate() + mondayOffset)
+  return formatDateStr(monday)
+}
+
+function daysBetween(earlierStr, laterStr) {
+  const a = new Date(earlierStr)
+  const b = new Date(laterStr)
+  return Math.round((b - a) / (1000 * 60 * 60 * 24))
+}
+
+function resolveMorningContext(date) {
+  const yesterday = getYesterday(date)
+  const MAX_LOOKBACK = 30
+
+  const yesterdayFile = path.join(REPORTS_DIR, 'daily', `${yesterday}.json`)
+  if (fs.existsSync(yesterdayFile)) {
+    return {
+      mode: 'daily',
+      sourceDate: yesterday,
+      stalenessDays: 0,
+      dailyReport: JSON.parse(fs.readFileSync(yesterdayFile, 'utf-8')),
+      weeklyReport: null,
+    }
+  }
+
+  const weekStart = getWeekStart(yesterday)
+  const weeklyFile = path.join(REPORTS_DIR, 'weekly', `${weekStart}.json`)
+  if (fs.existsSync(weeklyFile)) {
+    const report = JSON.parse(fs.readFileSync(weeklyFile, 'utf-8'))
+    if (yesterday >= report.weekStart && yesterday <= report.weekEnd) {
+      return {
+        mode: 'weekly',
+        sourceDate: report.weekStart,
+        stalenessDays: 0,
+        dailyReport: null,
+        weeklyReport: report,
+      }
+    }
+  }
+
+  let mostRecentDaily = null
+  let mostRecentDailyDate = null
+  let mostRecentWeekly = null
+  let mostRecentWeeklyEnd = null
+
+  const dailyDir = path.join(REPORTS_DIR, 'daily')
+  const weeklyDir = path.join(REPORTS_DIR, 'weekly')
+
+  if (fs.existsSync(dailyDir)) {
+    const files = fs.readdirSync(dailyDir).filter(f => f.endsWith('.json')).sort().reverse()
+    for (const f of files) {
+      const fileDate = f.replace('.json', '')
+      const daysDiff = daysBetween(fileDate, date)
+      if (daysDiff > MAX_LOOKBACK) break
+      if (daysDiff > 0) {
+        mostRecentDaily = JSON.parse(fs.readFileSync(path.join(dailyDir, f), 'utf-8'))
+        mostRecentDailyDate = fileDate
+        break
+      }
+    }
+  }
+
+  if (fs.existsSync(weeklyDir)) {
+    const files = fs.readdirSync(weeklyDir).filter(f => f.endsWith('.json')).sort().reverse()
+    for (const f of files) {
+      const report = JSON.parse(fs.readFileSync(path.join(weeklyDir, f), 'utf-8'))
+      const daysDiff = daysBetween(report.weekEnd, date)
+      if (daysDiff > 0 && daysDiff <= MAX_LOOKBACK) {
+        mostRecentWeekly = report
+        mostRecentWeeklyEnd = report.weekEnd
+        break
+      }
+    }
+  }
+
+  if (mostRecentDaily && mostRecentWeekly) {
+    if (mostRecentDailyDate > mostRecentWeeklyEnd) {
+      return {
+        mode: 'fallback-daily',
+        sourceDate: mostRecentDailyDate,
+        stalenessDays: daysBetween(mostRecentDailyDate, date),
+        dailyReport: mostRecentDaily,
+        weeklyReport: null,
+      }
+    } else {
+      return {
+        mode: 'fallback-weekly',
+        sourceDate: mostRecentWeekly.weekStart,
+        stalenessDays: daysBetween(mostRecentWeeklyEnd, date),
+        dailyReport: null,
+        weeklyReport: mostRecentWeekly,
+      }
+    }
+  }
+
+  if (mostRecentDaily) {
+    return {
+      mode: 'fallback-daily',
+      sourceDate: mostRecentDailyDate,
+      stalenessDays: daysBetween(mostRecentDailyDate, date),
+      dailyReport: mostRecentDaily,
+      weeklyReport: null,
+    }
+  }
+
+  if (mostRecentWeekly) {
+    return {
+      mode: 'fallback-weekly',
+      sourceDate: mostRecentWeekly.weekStart,
+      stalenessDays: daysBetween(mostRecentWeeklyEnd, date),
+      dailyReport: null,
+      weeklyReport: mostRecentWeekly,
+    }
+  }
+
+  return {
+    mode: 'tasks-only',
+    sourceDate: null,
+    stalenessDays: null,
+    dailyReport: null,
+    weeklyReport: null,
+  }
+}
+
 // ========== LLM Service ==========
 
 async function callLLM(messages, onChunk) {
@@ -243,25 +379,46 @@ app.post('/api/reports/morning-plan/generate', (req, res) => {
   const date = req.body.date || getToday()
   const tasks = readTasks()
   const now = new Date().toISOString()
-  const yesterday = getYesterday(date)
-
-  let yesterdayReport = null
-  const yesterdayFile = path.join(REPORTS_DIR, 'daily', `${yesterday}.json`)
-  if (fs.existsSync(yesterdayFile)) {
-    yesterdayReport = JSON.parse(fs.readFileSync(yesterdayFile, 'utf-8'))
-  }
+  const ctx = resolveMorningContext(date)
 
   const inProgress = tasks.filter(t => t.status === 'in_progress')
   const todo = tasks.filter(t => t.status === 'todo')
   const blocked = tasks.filter(t => t.blocked)
-  const doneToday = tasks.filter(t => t.status === 'done' && t.completedAt && t.completedAt.startsWith(date))
+
+  let yesterdayCompleted = []
+  let yesterdayUnfinished = []
+  let yesterdayBlockers = []
+  let yesterdayTomorrowPlan = []
+
+  if (ctx.mode === 'daily' || ctx.mode === 'fallback-daily') {
+    const yr = ctx.dailyReport
+    yesterdayCompleted = (yr.completedMain || []).concat(yr.completedSide || []).map(t => t.title)
+    yesterdayUnfinished = (yr.inProgress || []).map(t => ({ title: t.title, type: t.type, progress: t.progress }))
+    yesterdayBlockers = yr.blockers || []
+    yesterdayTomorrowPlan = yr.tomorrowPlan || []
+  } else if (ctx.mode === 'weekly' || ctx.mode === 'fallback-weekly') {
+    const wr = ctx.weeklyReport
+    const lastDaily = (wr.dailyReports || [])[wr.dailyReports.length - 1]
+    yesterdayCompleted = wr.highlights || []
+    yesterdayUnfinished = lastDaily ? (lastDaily.inProgress || []).map(t => ({ title: t.title, type: t.type, progress: t.progress })) : []
+    yesterdayBlockers = wr.issues || []
+    yesterdayTomorrowPlan = wr.nextWeekPlan || []
+  }
+
+  const contextLabels = {
+    daily: '昨日衔接',
+    weekly: '上周回顾',
+    'fallback-daily': '历史日报衔接',
+    'fallback-weekly': '历史周报回顾',
+    'tasks-only': '纯任务驱动',
+  }
 
   const plan = {
     date,
-    yesterdayCompleted: yesterdayReport ? (yesterdayReport.completedMain || []).concat(yesterdayReport.completedSide || []).map(t => t.title) : [],
-    yesterdayUnfinished: yesterdayReport ? (yesterdayReport.inProgress || []).map(t => ({ title: t.title, type: t.type, progress: t.progress })) : [],
-    yesterdayBlockers: yesterdayReport ? (yesterdayReport.blockers || []) : [],
-    yesterdayTomorrowPlan: yesterdayReport ? (yesterdayReport.tomorrowPlan || []) : [],
+    yesterdayCompleted,
+    yesterdayUnfinished,
+    yesterdayBlockers,
+    yesterdayTomorrowPlan,
     inbox: req.body.inbox || [],
     nextActions: req.body.nextActions || inProgress.concat(todo).slice(0, 8).map(t => ({
       title: t.title,
@@ -276,6 +433,9 @@ app.post('/api/reports/morning-plan/generate', (req, res) => {
     waiting: blocked.map(t => ({ title: t.title, reason: t.blockedReason })),
     notes: req.body.notes || '',
     llmContent: req.body.llmContent || '',
+    contextMode: ctx.mode,
+    contextSourceDate: ctx.sourceDate,
+    contextStalenessDays: ctx.stalenessDays,
     createdAt: now,
     updatedAt: now,
   }
@@ -284,7 +444,8 @@ app.post('/api/reports/morning-plan/generate', (req, res) => {
   ensureDir(dir)
   fs.writeFileSync(path.join(dir, `${date}.json`), JSON.stringify(plan, null, 2), 'utf-8')
 
-  const md = generateMorningPlanMarkdown(plan)
+  const contextLabel = contextLabels[ctx.mode] || '昨日衔接'
+  const md = generateMorningPlanMarkdown(plan, contextLabel)
   const mdDir = getMdDir('daily', date)
   ensureDir(mdDir)
   fs.writeFileSync(path.join(mdDir, `${date}-plan.md`), md, 'utf-8')
@@ -300,7 +461,14 @@ app.put('/api/reports/morning-plan/:date', (req, res) => {
   const updated = { ...existing, ...req.body, date: req.params.date, updatedAt: now }
   fs.writeFileSync(filePath, JSON.stringify(updated, null, 2), 'utf-8')
 
-  const md = generateMorningPlanMarkdown(updated)
+  const contextLabels = {
+    daily: '昨日衔接',
+    weekly: '上周回顾',
+    'fallback-daily': '历史日报衔接',
+    'fallback-weekly': '历史周报回顾',
+    'tasks-only': '纯任务驱动',
+  }
+  const md = generateMorningPlanMarkdown(updated, contextLabels[updated.contextMode] || '昨日衔接')
   const mdDir = getMdDir('daily', req.params.date)
   ensureDir(mdDir)
   fs.writeFileSync(path.join(mdDir, `${req.params.date}-plan.md`), md, 'utf-8')
@@ -308,12 +476,12 @@ app.put('/api/reports/morning-plan/:date', (req, res) => {
   res.json(updated)
 })
 
-function generateMorningPlanMarkdown(plan) {
+function generateMorningPlanMarkdown(plan, contextLabel) {
   const tpl = loadTemplate('morning-plan')
   const lines = []
   lines.push(tpl.title.replace('{{date}}', plan.date))
   lines.push('')
-  lines.push(tpl.subtitle)
+  lines.push(tpl.subtitle.replace('{{contextLabel}}', contextLabel || '昨日衔接'))
   lines.push('')
   lines.push('---')
   lines.push('')
@@ -630,6 +798,12 @@ app.get('/api/reports/weekly', (req, res) => {
   const files = fs.readdirSync(dir).filter(f => f.endsWith('.json')).sort().reverse()
   const reports = files.map(f => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf-8')))
   res.json(reports)
+})
+
+app.get('/api/reports/weekly/:weekStart', (req, res) => {
+  const filePath = path.join(REPORTS_DIR, 'weekly', `${req.params.weekStart}.json`)
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Report not found' })
+  res.json(JSON.parse(fs.readFileSync(filePath, 'utf-8')))
 })
 
 app.delete('/api/reports/weekly/:weekStart', (req, res) => {
@@ -1078,31 +1252,53 @@ function taskToContext(t) {
 app.post('/api/llm/generate-morning-plan', async (req, res) => {
   const date = req.body.date || getToday()
   const tasks = readTasks()
-  const yesterday = getYesterday(date)
-  let yesterdayReport = null
-  const yesterdayFile = path.join(REPORTS_DIR, 'daily', `${yesterday}.json`)
-  if (fs.existsSync(yesterdayFile)) {
-    yesterdayReport = JSON.parse(fs.readFileSync(yesterdayFile, 'utf-8'))
-  }
+  const ctx = resolveMorningContext(date)
 
   const inProgress = tasks.filter(t => t.status === 'in_progress')
   const todo = tasks.filter(t => t.status === 'todo')
   const blocked = tasks.filter(t => t.blocked)
 
+  const yesterdayReportData = ctx.dailyReport ? {
+    completedMain: (ctx.dailyReport.completedMain || []).map(t => typeof t === 'string' ? t : taskToContext(t)),
+    completedSide: (ctx.dailyReport.completedSide || []).map(t => typeof t === 'string' ? t : taskToContext(t)),
+    inProgress: (ctx.dailyReport.inProgress || []).map(t => typeof t === 'string' ? t : taskToContext(t)),
+    blockers: ctx.dailyReport.blockers || [],
+    tomorrowPlan: ctx.dailyReport.tomorrowPlan || [],
+    deviationAnalysis: ctx.dailyReport.deviationAnalysis || '',
+    improvementMeasures: ctx.dailyReport.improvementMeasures || '',
+    llmContent: ctx.dailyReport.llmContent || '',
+    notes: ctx.dailyReport.notes || '',
+    focusScore: ctx.dailyReport.focusScore,
+  } : null
+
+  const weeklyReportData = ctx.weeklyReport ? {
+    weekStart: ctx.weeklyReport.weekStart,
+    weekEnd: ctx.weeklyReport.weekEnd,
+    nextWeekPlan: ctx.weeklyReport.nextWeekPlan || [],
+    improvementMeasures: ctx.weeklyReport.improvementMeasures || '',
+    deviationAnalysis: ctx.weeklyReport.deviationAnalysis || '',
+    issues: ctx.weeklyReport.issues || [],
+    highlights: ctx.weeklyReport.highlights || [],
+    avgFocusScore: ctx.weeklyReport.avgFocusScore || null,
+    lastDailyReport: (() => {
+      const dailies = ctx.weeklyReport.dailyReports || []
+      if (dailies.length === 0) return null
+      const last = dailies[dailies.length - 1]
+      return {
+        date: last.date,
+        tomorrowPlan: last.tomorrowPlan || [],
+        inProgress: (last.inProgress || []).map(t => taskToContext(t)),
+        blockers: last.blockers || [],
+      }
+    })(),
+  } : null
+
   const contextData = {
     date,
-    yesterdayReport: yesterdayReport ? {
-      completedMain: (yesterdayReport.completedMain || []).map(t => typeof t === 'string' ? t : taskToContext(t)),
-      completedSide: (yesterdayReport.completedSide || []).map(t => typeof t === 'string' ? t : taskToContext(t)),
-      inProgress: (yesterdayReport.inProgress || []).map(t => typeof t === 'string' ? t : taskToContext(t)),
-      blockers: yesterdayReport.blockers || [],
-      tomorrowPlan: yesterdayReport.tomorrowPlan || [],
-      deviationAnalysis: yesterdayReport.deviationAnalysis || '',
-      improvementMeasures: yesterdayReport.improvementMeasures || '',
-      llmContent: yesterdayReport.llmContent || '',
-      notes: yesterdayReport.notes || '',
-      focusScore: yesterdayReport.focusScore,
-    } : null,
+    contextMode: ctx.mode,
+    contextStalenessDays: ctx.stalenessDays,
+    yesterdayReport: yesterdayReportData,
+    weeklyReport: weeklyReportData,
     currentTasks: {
       inProgress: inProgress.map(taskToContext),
       todo: todo.map(taskToContext),

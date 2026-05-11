@@ -73,9 +73,15 @@ pub struct MorningPlan {
     pub next_actions: Vec<NextAction>,
     pub waiting: Vec<WaitingItem>,
     pub notes: String,
-    pub llm_content: String,
-    pub created_at: String,
-    pub updated_at: String,
+  pub llm_content: String,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub context_mode: Option<String>,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub context_source_date: Option<String>,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub context_staleness_days: Option<i32>,
+  pub created_at: String,
+  pub updated_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

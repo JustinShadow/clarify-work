@@ -6,7 +6,7 @@ import { getTodayDateStr } from '../utils/priority'
 import { MarkdownContent } from '../utils/markdown'
 import Layout from '../components/Layout'
 import LLMDialog from '../components/LLMDialog'
-import { Sunrise, Sparkles } from 'lucide-react'
+import { Sunrise, Sparkles, FileText, AlertTriangle } from 'lucide-react'
 
 function buildSummary(plan: MorningPlan): string {
   const inProgress = plan.nextActions.filter(t => t.status === 'in_progress')
@@ -25,6 +25,47 @@ function buildSummary(plan: MorningPlan): string {
     parts.push('今日无新增')
   }
   return parts.join('，')
+}
+
+function ContextBanner({ mode, sourceDate, stalenessDays }: {
+  mode: string
+  sourceDate?: string
+  stalenessDays?: number
+}) {
+  if (mode === 'tasks-only' || mode === 'daily') return null
+
+  const isStale = (stalenessDays ?? 0) > 7
+
+  const config = {
+    weekly: {
+      Icon: FileText,
+      bg: 'bg-[#eff6ff]', border: 'border-[#bfdbfe]', text: 'text-[#1e40af]',
+      label: '基于上周周报生成',
+    },
+    'fallback-daily': {
+      Icon: AlertTriangle,
+      bg: isStale ? 'bg-[#fee2e2]' : 'bg-[#ffedd5]',
+      border: isStale ? 'border-[#fca5a5]' : 'border-[#fdba74]',
+      text: isStale ? 'text-[#991b1b]' : 'text-[#c2410c]',
+      label: `基于 ${sourceDate} 日报生成（距今${stalenessDays}天，请核实任务状态）`,
+    },
+    'fallback-weekly': {
+      Icon: AlertTriangle,
+      bg: isStale ? 'bg-[#fee2e2]' : 'bg-[#ffedd5]',
+      border: isStale ? 'border-[#fca5a5]' : 'border-[#fdba74]',
+      text: isStale ? 'text-[#991b1b]' : 'text-[#c2410c]',
+      label: `基于 ${sourceDate} 周报生成（距今${stalenessDays}天，请核实任务状态）`,
+    },
+  }[mode]
+
+  if (!config) return null
+
+  return (
+    <div className={`${config.bg} ${config.border} border rounded-xl px-4 py-2.5 text-sm ${config.text} flex items-center gap-2`}>
+      <config.Icon size={14} />
+      <span>{config.label}</span>
+    </div>
+  )
 }
 
 export default function MorningPlanPage() {
@@ -114,13 +155,22 @@ export default function MorningPlanPage() {
               <Link to="/" className="text-xs text-[#3b82f6] hover:underline">查看看板</Link>
             </div>
             {currentPlan.llmContent && (
-              <div className="bg-white rounded-2xl border border-[#e2e8f0] shadow-sm overflow-hidden">
-                <div className="px-4 py-3 bg-[#eff6ff] border-b border-[#bfdbfe] flex items-center gap-2">
-                  <Sparkles size={14} className="text-[#3b82f6]" />
-                  <span className="text-sm font-semibold text-[#1e40af]">AI 规划建议</span>
-                </div>
-                <div className="px-6 py-5">
-                  <MarkdownContent content={currentPlan.llmContent} theme="blue" />
+              <div className="space-y-4">
+                {currentPlan.contextMode && currentPlan.contextMode !== 'daily' && (
+                  <ContextBanner
+                    mode={currentPlan.contextMode}
+                    sourceDate={currentPlan.contextSourceDate}
+                    stalenessDays={currentPlan.contextStalenessDays}
+                  />
+                )}
+                <div className="bg-white rounded-2xl border border-[#e2e8f0] shadow-sm overflow-hidden">
+                  <div className="px-4 py-3 bg-[#eff6ff] border-b border-[#bfdbfe] flex items-center gap-2">
+                    <Sparkles size={14} className="text-[#3b82f6]" />
+                    <span className="text-sm font-semibold text-[#1e40af]">AI 规划建议</span>
+                  </div>
+                  <div className="px-6 py-5">
+                    <MarkdownContent content={currentPlan.llmContent} theme="blue" />
+                  </div>
                 </div>
               </div>
             )}

@@ -22,6 +22,9 @@ export interface MorningPlanAPI {
     nextActions?: Record<string, unknown>[]
     notes?: string
     llmContent?: string
+    contextMode?: string
+    contextSourceDate?: string
+    contextStalenessDays?: number
   }) => Promise<MorningPlan>
   update: (date: string, data: Partial<MorningPlan>) => Promise<MorningPlan>
 }

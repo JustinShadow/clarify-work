@@ -47,6 +47,9 @@ export interface MorningPlan {
   waiting: { title: string; reason: string }[]
   notes: string
   llmContent: string
+  contextMode?: 'daily' | 'weekly' | 'fallback-daily' | 'fallback-weekly' | 'tasks-only'
+  contextSourceDate?: string
+  contextStalenessDays?: number
   createdAt: string
   updatedAt: string
 }

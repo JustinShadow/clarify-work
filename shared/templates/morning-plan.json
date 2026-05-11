@@ -1,6 +1,6 @@
 {
   "title": "# 🌅 晨间工作规划 - {{date}}",
-  "subtitle": "> 基于GTD框架 · 可执行动作驱动 | 昨日衔接 + 今日规划",
+  "subtitle": "> 基于GTD框架 · 可执行动作驱动 | {{contextLabel}} + 今日规划",
   "sections": [
     {
       "id": "yesterdayUnfinished",

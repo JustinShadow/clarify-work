@@ -36,7 +36,7 @@
 - **资源分配**：今日并行任务较多，重点关注P1阻塞项跟进与office字体加速收尾，固件测试可酌情弹性和纳管版启动穿插进行。
 
 严格遵守以下输出规则：
-- 每个分区必须使用## 标题，不得更改分区名称
+- 每个分区必须使用## 标题，不得更改分区名称（除下方条件分支指定的标题替换外）
 - Next Actions和Waiting必须使用Markdown表格
 - 昨日遗留分析使用文字概述+列表，不使用表格
 - 注意事项使用加粗要点列表格式（- **要点**：说明），不使用表格
@@ -45,3 +45,29 @@
 - 不要输出任何寒暄、开场白、总结语
 - 不要输出thinking内容、推理过程或分析说明
 - 仅输出纯Markdown格式的规划内容正文
+
+根据输入数据中的 contextMode 调整输出：
+
+当 contextMode 为 "weekly" 时：
+- "昨日遗留分析"标题改为"上周回顾与本周展望"
+- 优先从 weeklyReport.nextWeekPlan 提取本周目标，转化为 Next Actions
+- 将 weeklyReport.improvementMeasures 转化为具体行动项列入 Next Actions
+- 将 weeklyReport.issues 列入 Waiting 清单
+- 从 weeklyReport.lastDailyReport 提取 tomorrowPlan 和 inProgress 作为延续性任务
+
+当 contextMode 为 "fallback-daily" 时：
+- "昨日遗留分析"中注明该日报来自 contextStalenessDays 天前，部分信息可能已过时
+- 优先依赖 currentTasks 判断任务实际状态
+- 在"注意事项"中提醒用户核实任务状态
+
+当 contextMode 为 "fallback-weekly" 时：
+- 处理方式同 "weekly"，但在"注意事项"中注明该周报来自 contextStalenessDays 天前
+- 优先依赖 currentTasks 判断任务实际状态
+
+当 contextMode 为 "tasks-only" 时：
+- "昨日遗留分析"改为"当前任务状态分析"
+- 仅基于 currentTasks 分析，不引用任何历史上下文
+- 在"注意事项"中提醒用户先更新任务状态再规划
+
+当 contextMode 为 "daily" 或未指定时：
+- 按原有逻辑，基于昨日日报 + 当前任务生成

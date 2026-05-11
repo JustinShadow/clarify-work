@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 use tauri::State;
+use chrono::Datelike;
 use crate::models::*;
 use crate::AppData;
 use crate::commands::tasks;
@@ -104,6 +105,150 @@ pub fn yesterday(date: &str) -> String {
         .unwrap_or_else(|_| today())
 }
 
+pub fn get_week_start(date_str: &str) -> String {
+    chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
+        .map(|d| {
+            let weekday = d.weekday().num_days_from_monday() as i64;
+            let monday = d - chrono::Duration::days(weekday);
+            monday.format("%Y-%m-%d").to_string()
+        })
+        .unwrap_or_else(|_| date_str.to_string())
+}
+
+pub fn days_between(earlier: &str, later: &str) -> i32 {
+    let a = chrono::NaiveDate::parse_from_str(earlier, "%Y-%m-%d");
+    let b = chrono::NaiveDate::parse_from_str(later, "%Y-%m-%d");
+    match (a, b) {
+        (Ok(a), Ok(b)) => (b - a).num_days() as i32,
+        _ => 999,
+    }
+}
+
+pub struct MorningContext {
+    pub mode: String,
+    pub source_date: Option<String>,
+    pub staleness_days: Option<i32>,
+    pub daily_report: Option<crate::models::DailyReport>,
+    pub weekly_report: Option<crate::models::WeeklyReport>,
+}
+
+pub fn resolve_morning_context(state: &AppData, date: &str) -> MorningContext {
+    let yesterday_date = yesterday(date);
+    let rdir = reports_dir(state);
+
+    let yesterday_file = rdir.join("daily").join(format!("{}.json", yesterday_date));
+    if let Some(yr) = read_json_file::<crate::models::DailyReport>(&yesterday_file) {
+        return MorningContext {
+            mode: "daily".to_string(),
+            source_date: Some(yesterday_date),
+            staleness_days: Some(0),
+            daily_report: Some(yr),
+            weekly_report: None,
+        };
+    }
+
+    let week_start = get_week_start(&yesterday_date);
+    let weekly_file = rdir.join("weekly").join(format!("{}.json", week_start));
+    if let Some(wr) = read_json_file::<crate::models::WeeklyReport>(&weekly_file) {
+        if yesterday_date >= wr.week_start && yesterday_date <= wr.week_end {
+            return MorningContext {
+                mode: "weekly".to_string(),
+                source_date: Some(wr.week_start.clone()),
+                staleness_days: Some(0),
+                daily_report: None,
+                weekly_report: Some(wr),
+            };
+        }
+    }
+
+    let mut most_recent_daily: Option<crate::models::DailyReport> = None;
+    let mut most_recent_daily_date: Option<String> = None;
+    let mut most_recent_weekly: Option<crate::models::WeeklyReport> = None;
+    let mut most_recent_weekly_end: Option<String> = None;
+
+    let daily_dir = rdir.join("daily");
+    if let Ok(entries) = fs::read_dir(&daily_dir) {
+        let mut files: Vec<_> = entries
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().map(|ext| ext == "json").unwrap_or(false))
+            .collect();
+        files.sort_by(|a, b| b.path().cmp(&a.path()));
+        for entry in files {
+            if let Some(report) = read_json_file::<crate::models::DailyReport>(&entry.path()) {
+                let diff = days_between(&report.date, date);
+                if diff > 30 { break; }
+                if diff > 0 {
+                    most_recent_daily = Some(report.clone());
+                    most_recent_daily_date = Some(report.date.clone());
+                    break;
+                }
+            }
+        }
+    }
+
+    let weekly_dir = rdir.join("weekly");
+    if let Ok(entries) = fs::read_dir(&weekly_dir) {
+        let mut files: Vec<_> = entries
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().map(|ext| ext == "json").unwrap_or(false))
+            .collect();
+        files.sort_by(|a, b| b.path().cmp(&a.path()));
+        for entry in files {
+            if let Some(report) = read_json_file::<crate::models::WeeklyReport>(&entry.path()) {
+                let diff = days_between(&report.week_end, date);
+                if diff > 0 && diff <= 30 {
+                    most_recent_weekly = Some(report.clone());
+                    most_recent_weekly_end = Some(report.week_end.clone());
+                    break;
+                }
+            }
+        }
+    }
+
+    match (&most_recent_daily_date, &most_recent_weekly_end) {
+        (Some(d_date), Some(w_end)) => {
+            if d_date > w_end {
+                MorningContext {
+                    mode: "fallback-daily".to_string(),
+                    source_date: Some(d_date.clone()),
+                    staleness_days: Some(days_between(d_date, date)),
+                    daily_report: most_recent_daily,
+                    weekly_report: None,
+                }
+            } else {
+                MorningContext {
+                    mode: "fallback-weekly".to_string(),
+                    source_date: most_recent_weekly.as_ref().map(|w| w.week_start.clone()),
+                    staleness_days: Some(days_between(w_end, date)),
+                    daily_report: None,
+                    weekly_report: most_recent_weekly,
+                }
+            }
+        }
+        (Some(d_date), None) => MorningContext {
+            mode: "fallback-daily".to_string(),
+            source_date: Some(d_date.clone()),
+            staleness_days: Some(days_between(d_date, date)),
+            daily_report: most_recent_daily,
+            weekly_report: None,
+        },
+        (None, Some(w_end)) => MorningContext {
+            mode: "fallback-weekly".to_string(),
+            source_date: most_recent_weekly.as_ref().map(|w| w.week_start.clone()),
+            staleness_days: Some(days_between(w_end, date)),
+            daily_report: None,
+            weekly_report: most_recent_weekly,
+        },
+        (None, None) => MorningContext {
+            mode: "tasks-only".to_string(),
+            source_date: None,
+            staleness_days: None,
+            daily_report: None,
+            weekly_report: None,
+        },
+    }
+}
+
 pub fn read_json_file<T: serde::de::DeserializeOwned>(path: &PathBuf) -> Option<T> {
     if !path.exists() { return None; }
     let content = fs::read_to_string(path).ok()?;
@@ -139,12 +284,12 @@ fn get_md_dir(state: &AppData, category: &str, date_or_month: &str) -> PathBuf {
 
 // ========== Morning Plan Markdown ==========
 
-fn generate_morning_plan_markdown(plan: &MorningPlan) -> String {
+fn generate_morning_plan_markdown(plan: &MorningPlan, context_label: &str) -> String {
     let tpl = load_template("morning-plan");
     let mut lines = vec![];
     lines.push(tpl.title.replace("{{date}}", &plan.date));
     lines.push(String::new());
-    lines.push(tpl.subtitle.clone());
+    lines.push(tpl.subtitle.replace("{{contextLabel}}", context_label));
     lines.push(String::new());
     lines.push("---".to_string());
     lines.push(String::new());
@@ -694,48 +839,50 @@ pub fn generate_morning_plan(state: State<AppData>, input: MorningPlanInput) -> 
     let date = input.date.unwrap_or_else(|| today());
     let tasks = tasks::read_tasks_from_state(&state);
     let now = now_iso();
-    let yesterday_date = yesterday(&date);
-
-    let mut yesterday_report: Option<DailyReport> = None;
-    let yesterday_file = reports_dir(&state).join("daily").join(format!("{}.json", yesterday_date));
-    if yesterday_file.exists() {
-        yesterday_report = read_json_file::<DailyReport>(&yesterday_file);
-    }
+    let ctx = resolve_morning_context(&state, &date);
 
     let in_progress: Vec<&Task> = tasks.iter().filter(|t| t.status == "in_progress").collect();
     let todo: Vec<&Task> = tasks.iter().filter(|t| t.status == "todo").collect();
     let blocked: Vec<&Task> = tasks.iter().filter(|t| t.blocked).collect();
 
-    let yesterday_completed = if let Some(ref yr) = yesterday_report {
-        let mut titles = vec![];
-        for t in &yr.completed_main { titles.push(t.title.clone()); }
-        for t in &yr.completed_side { titles.push(t.title.clone()); }
-        titles
-    } else {
-        vec![]
-    };
-
-    let yesterday_unfinished = if let Some(ref yr) = yesterday_report {
-        yr.in_progress.iter().map(|t| UnfinishedTask {
-            title: t.title.clone(),
-            task_type: t.task_type.clone(),
-            progress: t.progress,
-        }).collect()
-    } else {
-        vec![]
-    };
-
-    let yesterday_blockers = if let Some(ref yr) = yesterday_report {
-        yr.blockers.clone()
-    } else {
-        vec![]
-    };
-
-    let yesterday_tomorrow_plan = if let Some(ref yr) = yesterday_report {
-        yr.tomorrow_plan.clone()
-    } else {
-        vec![]
-    };
+    let (yesterday_completed, yesterday_unfinished, yesterday_blockers, yesterday_tomorrow_plan) =
+        match ctx.mode.as_str() {
+            "daily" | "fallback-daily" => {
+                let yr = ctx.daily_report.as_ref();
+                let completed = yr.map(|yr| {
+                    let mut titles = vec![];
+                    for t in &yr.completed_main { titles.push(t.title.clone()); }
+                    for t in &yr.completed_side { titles.push(t.title.clone()); }
+                    titles
+                }).unwrap_or_default();
+                let unfinished = yr.map(|yr| {
+                    yr.in_progress.iter().map(|t| UnfinishedTask {
+                        title: t.title.clone(),
+                        task_type: t.task_type.clone(),
+                        progress: t.progress,
+                    }).collect()
+                }).unwrap_or_default();
+                let blockers = yr.map(|yr| yr.blockers.clone()).unwrap_or_default();
+                let tomorrow = yr.map(|yr| yr.tomorrow_plan.clone()).unwrap_or_default();
+                (completed, unfinished, blockers, tomorrow)
+            }
+            "weekly" | "fallback-weekly" => {
+                let wr = ctx.weekly_report.as_ref();
+                let last_daily = wr.and_then(|wr| wr.daily_reports.last());
+                let completed = wr.map(|wr| wr.highlights.clone()).unwrap_or_default();
+                let unfinished = last_daily.map(|ld| {
+                    ld.in_progress.iter().map(|t| UnfinishedTask {
+                        title: t.title.clone(),
+                        task_type: t.task_type.clone(),
+                        progress: t.progress,
+                    }).collect()
+                }).unwrap_or_default();
+                let blockers = wr.map(|wr| wr.issues.clone()).unwrap_or_default();
+                let tomorrow = wr.map(|wr| wr.next_week_plan.clone()).unwrap_or_default();
+                (completed, unfinished, blockers, tomorrow)
+            }
+            _ => (vec![], vec![], vec![], vec![]),
+        };
 
     let mut next_actions: Vec<NextAction> = in_progress.iter().chain(todo.iter()).take(8).map(|t| NextAction {
         title: t.title.clone(),
@@ -769,6 +916,18 @@ pub fn generate_morning_plan(state: State<AppData>, input: MorningPlanInput) -> 
         reason: t.blocked_reason.clone(),
     }).collect();
 
+    let context_labels = [
+        ("daily", "昨日衔接"),
+        ("weekly", "上周回顾"),
+        ("fallback-daily", "历史日报衔接"),
+        ("fallback-weekly", "历史周报回顾"),
+        ("tasks-only", "纯任务驱动"),
+    ];
+    let context_label = context_labels.iter()
+        .find(|(k, _)| *k == ctx.mode)
+        .map(|(_, v)| *v)
+        .unwrap_or("昨日衔接");
+
     let plan = MorningPlan {
         date: date.clone(),
         yesterday_completed,
@@ -780,6 +939,9 @@ pub fn generate_morning_plan(state: State<AppData>, input: MorningPlanInput) -> 
         waiting,
         notes: input.notes.unwrap_or_default(),
         llm_content: input.llm_content.unwrap_or_default(),
+        context_mode: Some(ctx.mode.clone()),
+        context_source_date: ctx.source_date.clone(),
+        context_staleness_days: ctx.staleness_days,
         created_at: now.clone(),
         updated_at: now,
     };
@@ -788,7 +950,7 @@ pub fn generate_morning_plan(state: State<AppData>, input: MorningPlanInput) -> 
     ensure_dir(&dir);
     write_json_file(&dir.join(format!("{}.json", plan.date)), &plan);
 
-    let md = generate_morning_plan_markdown(&plan);
+    let md = generate_morning_plan_markdown(&plan, context_label);
     let md_path = get_md_dir(&state, "daily", &plan.date);
     fs::write(md_path.join(format!("{}-plan.md", plan.date)), md).unwrap();
 
@@ -821,7 +983,17 @@ pub fn update_morning_plan(state: State<AppData>, date: String, data: MorningPla
     existing.updated_at = now;
     write_json_file(&path, &existing);
 
-    let md = generate_morning_plan_markdown(&existing);
+    let context_labels = [
+        ("daily", "昨日衔接"),
+        ("weekly", "上周回顾"),
+        ("fallback-daily", "历史日报衔接"),
+        ("fallback-weekly", "历史周报回顾"),
+        ("tasks-only", "纯任务驱动"),
+    ];
+    let context_label = existing.context_mode.as_deref()
+        .and_then(|m| context_labels.iter().find(|(k, _)| *k == m).map(|(_, v)| *v))
+        .unwrap_or("昨日衔接");
+    let md = generate_morning_plan_markdown(&existing, context_label);
     let md_path = get_md_dir(&state, "daily", &date);
     fs::write(md_path.join(format!("{}-plan.md", date)), md).unwrap();
 

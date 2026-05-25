@@ -1,11 +1,107 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { dailyReportApi, llmApi } from '../api'
 import type { DailyReport } from '../types'
-import { getTodayDateStr } from '../utils/priority'
+import { getTodayDateStr, isThisWeek, getISOWeek, getWeekStartDate, getWeekEndDate, getMonthKey, getYearKey, getMonthLabel, formatDateShort, getISOWeekYear } from '../utils/priority'
 import Layout from '../components/Layout'
-import ReportCard from '../components/ReportCard'
+import ReportGroup from '../components/ReportGroup'
+import type { GroupNode } from '../components/ReportGroup'
 import LLMDialog from '../components/LLMDialog'
 import { FileText, Sparkles } from 'lucide-react'
+
+function buildDailyGroups(reports: DailyReport[]): {
+  flatItems: { label: string; accentColor: string; items: DailyReport[] }
+  groups: GroupNode[]
+} {
+  const thisWeekReports: DailyReport[] = []
+  const olderReports: DailyReport[] = []
+
+  for (const r of reports) {
+    if (isThisWeek(r.date)) {
+      thisWeekReports.push(r)
+    } else {
+      olderReports.push(r)
+    }
+  }
+
+  const weekMap = new Map<string, DailyReport[]>()
+  for (const r of olderReports) {
+    const weekYear = getISOWeekYear(r.date)
+    const weekNum = getISOWeek(r.date)
+    const key = `${weekYear}-W${String(weekNum).padStart(2, '0')}`
+    if (!weekMap.has(key)) weekMap.set(key, [])
+    weekMap.get(key)!.push(r)
+  }
+
+  const monthMap = new Map<string, Map<string, DailyReport[]>>()
+  for (const [weekKey, weekReports] of weekMap) {
+    const monthKey = getMonthKey(weekReports[0].date)
+    if (!monthMap.has(monthKey)) monthMap.set(monthKey, new Map())
+    monthMap.get(monthKey)!.set(weekKey, weekReports)
+  }
+
+  const yearMap = new Map<string, Map<string, Map<string, DailyReport[]>>>()
+  for (const [monthKey, weeks] of monthMap) {
+    const yearKey = getYearKey(monthKey)
+    if (!yearMap.has(yearKey)) yearMap.set(yearKey, new Map())
+    yearMap.get(yearKey)!.set(monthKey, weeks)
+  }
+
+  const groups: GroupNode[] = []
+
+  const sortedYears = [...yearMap.entries()].sort((a, b) => b[0].localeCompare(a[0]))
+  for (const [yearKey, months] of sortedYears) {
+    const monthGroups: GroupNode[] = []
+
+    const sortedMonths = [...months.entries()].sort((a, b) => b[0].localeCompare(a[0]))
+    for (const [monthKey, weeks] of sortedMonths) {
+      const weekGroups: GroupNode[] = []
+      const sortedWeeks = [...weeks.entries()].sort((a, b) => b[0].localeCompare(a[0]))
+
+      for (const [weekKey, weekReports] of sortedWeeks) {
+        const weekNum = parseInt(weekKey.split('W')[1])
+        const firstDate = weekReports[0].date
+        weekGroups.push({
+          key: weekKey,
+          label: `第${weekNum}周`,
+          dateRange: `${formatDateShort(getWeekStartDate(firstDate))} - ${formatDateShort(getWeekEndDate(firstDate))}`,
+          count: weekReports.length,
+          level: 'week',
+          items: weekReports,
+          defaultExpanded: false,
+        })
+      }
+
+      const allReportsInMonth = [...weeks.values()].flat()
+      monthGroups.push({
+        key: monthKey,
+        label: getMonthLabel(monthKey),
+        dateRange: `${formatDateShort(allReportsInMonth[allReportsInMonth.length - 1].date)} - ${formatDateShort(allReportsInMonth[0].date)}`,
+        count: allReportsInMonth.length,
+        children: weekGroups,
+        level: 'month',
+        defaultExpanded: false,
+      })
+    }
+
+    groups.push({
+      key: yearKey,
+      label: `${yearKey}年`,
+      count: [...months.values()].flatMap(m => [...m.values()].flat()).length,
+      children: monthGroups,
+      level: 'year',
+      defaultExpanded: getYearKey(getTodayDateStr()) === yearKey,
+    })
+  }
+
+  return {
+    flatItems: {
+      label: '本周',
+      accentColor: 'bg-[#10b981]',
+      items: thisWeekReports,
+    },
+    groups,
+  }
+}
 
 export default function DailyReports() {
   const [reports, setReports] = useState<DailyReport[]>([])
@@ -33,10 +129,12 @@ export default function DailyReports() {
 
   const handleDelete = async (report: DailyReport) => {
     try {
-      await dailyReportApi.delete((report as DailyReport).date)
+      await dailyReportApi.delete(report.date)
       fetchReports()
     } catch (err) { console.error(err) }
   }
+
+  const { flatItems, groups } = useMemo(() => buildDailyGroups(reports), [reports])
 
   const today = getTodayDateStr()
 
@@ -75,11 +173,7 @@ export default function DailyReports() {
             <p className="text-sm mt-2 text-[#94a3b8]">在首页看板中点击"生成日报"创建</p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {reports.map(report => (
-              <ReportCard key={report.date} report={report} type="daily" onDelete={handleDelete} />
-            ))}
-          </div>
+          <ReportGroup groups={groups} type="daily" onDelete={handleDelete} flatItems={flatItems} />
         )}
       </div>
 

@@ -1,11 +1,83 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { weeklyReportApi, llmApi } from '../api'
 import type { WeeklyReport } from '../types'
-import { getWeekRange } from '../utils/priority'
+import { getTodayDateStr, getMonthKey, getYearKey, getMonthLabel, formatDateShort, getWeekRange } from '../utils/priority'
 import Layout from '../components/Layout'
-import ReportCard from '../components/ReportCard'
+import ReportGroup from '../components/ReportGroup'
+import type { GroupNode } from '../components/ReportGroup'
 import LLMDialog from '../components/LLMDialog'
 import { Calendar, Sparkles } from 'lucide-react'
+
+function buildWeeklyGroups(reports: WeeklyReport[]): {
+  flatItems: { label: string; accentColor: string; items: WeeklyReport[] }
+  groups: GroupNode[]
+} {
+  const currentMonth = getMonthKey(getTodayDateStr())
+  const thisMonthReports: WeeklyReport[] = []
+  const olderReports: WeeklyReport[] = []
+
+  for (const r of reports) {
+    if (getMonthKey(r.weekStart) === currentMonth) {
+      thisMonthReports.push(r)
+    } else {
+      olderReports.push(r)
+    }
+  }
+
+  const monthMap = new Map<string, WeeklyReport[]>()
+  for (const r of olderReports) {
+    const mk = getMonthKey(r.weekStart)
+    if (!monthMap.has(mk)) monthMap.set(mk, [])
+    monthMap.get(mk)!.push(r)
+  }
+
+  const yearMap = new Map<string, Map<string, WeeklyReport[]>>()
+  for (const [monthKey, monthReports] of monthMap) {
+    const yearKey = getYearKey(monthKey)
+    if (!yearMap.has(yearKey)) yearMap.set(yearKey, new Map())
+    yearMap.get(yearKey)!.set(monthKey, monthReports)
+  }
+
+  const groups: GroupNode[] = []
+  const sortedYears = [...yearMap.entries()].sort((a, b) => b[0].localeCompare(a[0]))
+
+  for (const [yearKey, months] of sortedYears) {
+    const monthGroups: GroupNode[] = []
+    const sortedMonths = [...months.entries()].sort((a, b) => b[0].localeCompare(a[0]))
+
+    for (const [monthKey, monthReports] of sortedMonths) {
+      monthGroups.push({
+        key: monthKey,
+        label: getMonthLabel(monthKey),
+        dateRange: `${formatDateShort(monthReports[monthReports.length - 1].weekStart)} - ${formatDateShort(monthReports[0].weekEnd)}`,
+        count: monthReports.length,
+        level: 'month',
+        items: monthReports,
+        defaultExpanded: false,
+      })
+    }
+
+    const allInYear = [...months.values()].flat()
+    groups.push({
+      key: yearKey,
+      label: `${yearKey}年`,
+      count: allInYear.length,
+      badge: { text: `${monthGroups.length}月`, color: 'bg-[#dbeafe] text-[#1e40af]' },
+      children: monthGroups,
+      level: 'year',
+      defaultExpanded: getYearKey(getTodayDateStr()) === yearKey,
+    })
+  }
+
+  return {
+    flatItems: {
+      label: '本月',
+      accentColor: 'bg-[#3b82f6]',
+      items: thisMonthReports,
+    },
+    groups,
+  }
+}
 
 export default function WeeklyReports() {
   const [reports, setReports] = useState<WeeklyReport[]>([])
@@ -38,6 +110,7 @@ export default function WeeklyReports() {
     } catch (err) { console.error(err) }
   }
 
+  const { flatItems, groups } = useMemo(() => buildWeeklyGroups(reports), [reports])
   const { start, end } = getWeekRange()
 
   return (
@@ -50,7 +123,7 @@ export default function WeeklyReports() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-[#1e3a5f]">周报</h1>
-              <p className="text-sm text-[#64748b]">汇总一周工作成果与计划</p>
+              <p className="text-sm text-[#64748b]">每周工作总结与回顾</p>
             </div>
           </div>
           <button
@@ -72,14 +145,9 @@ export default function WeeklyReports() {
               <Calendar size={32} className="text-[#cbd5e1]" />
             </div>
             <p className="text-[#64748b]">暂无周报</p>
-            <p className="text-sm mt-2 text-[#94a3b8]">先创建日报，再生成周报汇总</p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {reports.map(report => (
-              <ReportCard key={report.weekStart} report={report} type="weekly" onDelete={handleDelete} />
-            ))}
-          </div>
+          <ReportGroup groups={groups} type="weekly" onDelete={handleDelete} flatItems={flatItems} />
         )}
       </div>
 

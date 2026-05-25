@@ -1,11 +1,60 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { monthlyReportApi, llmApi } from '../api'
 import type { MonthlyReport } from '../types'
-import { getCurrentMonth } from '../utils/priority'
+import { getTodayDateStr, getYearKey, getCurrentMonth } from '../utils/priority'
 import Layout from '../components/Layout'
-import ReportCard from '../components/ReportCard'
+import ReportGroup from '../components/ReportGroup'
+import type { GroupNode } from '../components/ReportGroup'
 import LLMDialog from '../components/LLMDialog'
 import { CalendarDays, Sparkles } from 'lucide-react'
+
+function buildMonthlyGroups(reports: MonthlyReport[]): {
+  flatItems: { label: string; accentColor: string; items: MonthlyReport[] }
+  groups: GroupNode[]
+} {
+  const currentYear = getYearKey(getTodayDateStr())
+  const thisYearReports: MonthlyReport[] = []
+  const olderReports: MonthlyReport[] = []
+
+  for (const r of reports) {
+    if (getYearKey(r.month) === currentYear) {
+      thisYearReports.push(r)
+    } else {
+      olderReports.push(r)
+    }
+  }
+
+  const yearMap = new Map<string, MonthlyReport[]>()
+  for (const r of olderReports) {
+    const yk = getYearKey(r.month)
+    if (!yearMap.has(yk)) yearMap.set(yk, [])
+    yearMap.get(yk)!.push(r)
+  }
+
+  const groups: GroupNode[] = []
+  const sortedYears = [...yearMap.entries()].sort((a, b) => b[0].localeCompare(a[0]))
+
+  for (const [yearKey, yearReports] of sortedYears) {
+    groups.push({
+      key: yearKey,
+      label: `${yearKey}年`,
+      count: yearReports.length,
+      badge: { text: `${yearReports.length}篇`, color: 'bg-[#dbeafe] text-[#1e40af]' },
+      level: 'year',
+      items: yearReports,
+      defaultExpanded: false,
+    })
+  }
+
+  return {
+    flatItems: {
+      label: '本年',
+      accentColor: 'bg-[#f59e0b]',
+      items: thisYearReports,
+    },
+    groups,
+  }
+}
 
 export default function MonthlyReports() {
   const [reports, setReports] = useState<MonthlyReport[]>([])
@@ -38,6 +87,8 @@ export default function MonthlyReports() {
     } catch (err) { console.error(err) }
   }
 
+  const { flatItems, groups } = useMemo(() => buildMonthlyGroups(reports), [reports])
+
   return (
     <Layout>
       <div className="space-y-6">
@@ -48,7 +99,7 @@ export default function MonthlyReports() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-[#1e3a5f]">月报</h1>
-              <p className="text-sm text-[#64748b]">总结月度成果与下月规划</p>
+              <p className="text-sm text-[#64748b]">月度工作总结与规划</p>
             </div>
           </div>
           <button
@@ -70,14 +121,9 @@ export default function MonthlyReports() {
               <CalendarDays size={32} className="text-[#cbd5e1]" />
             </div>
             <p className="text-[#64748b]">暂无月报</p>
-            <p className="text-sm mt-2 text-[#94a3b8]">先创建周报，再生成月报汇总</p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {reports.map(report => (
-              <ReportCard key={report.month} report={report} type="monthly" onDelete={handleDelete} />
-            ))}
-          </div>
+          <ReportGroup groups={groups} type="monthly" onDelete={handleDelete} flatItems={flatItems} />
         )}
       </div>
 

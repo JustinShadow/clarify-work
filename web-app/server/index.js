@@ -78,6 +78,22 @@ function writeTasks(tasks) {
   fs.writeFileSync(TASKS_FILE, JSON.stringify(tasks, null, 2), 'utf-8')
 }
 
+function autoArchiveTasks() {
+  const tasks = readTasks()
+  const now = new Date()
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
+  let changed = false
+  for (const task of tasks) {
+    if (task.status === 'done' && !task.archived && task.completedAt && task.completedAt < sevenDaysAgo) {
+      task.archived = true
+      task.archivedAt = now.toISOString()
+      changed = true
+    }
+  }
+  if (changed) writeTasks(tasks)
+  return changed
+}
+
 function readTags() {
   if (!fs.existsSync(TAGS_FILE)) return []
   return JSON.parse(fs.readFileSync(TAGS_FILE, 'utf-8'))
@@ -290,7 +306,15 @@ async function callLLM(messages, onChunk) {
 // ========== Task APIs ==========
 
 app.get('/api/tasks', (req, res) => {
-  res.json(readTasks())
+  autoArchiveTasks()
+  const tasks = readTasks()
+  const includeArchived = req.query.includeArchived === 'true'
+  const archivedCount = tasks.filter(t => t.archived).length
+  if (includeArchived) {
+    res.json({ tasks, archivedCount })
+  } else {
+    res.json({ tasks: tasks.filter(t => !t.archived), archivedCount })
+  }
 })
 
 app.post('/api/tasks', (req, res) => {
@@ -314,6 +338,8 @@ app.post('/api/tasks', (req, res) => {
     tags: req.body.tags || [],
     events: req.body.events || [],
     result: req.body.result || '',
+    archived: req.body.archived ?? false,
+    archivedAt: req.body.archivedAt || null,
   }
   if (task.tags.length > 0) syncTags(task.tags)
   tasks.push(task)
@@ -357,6 +383,35 @@ app.delete('/api/tasks/:id', (req, res) => {
   tasks = tasks.filter(t => t.id !== req.params.id)
   writeTasks(tasks)
   res.json({ success: true })
+})
+
+app.get('/api/tasks/archived', (req, res) => {
+  autoArchiveTasks()
+  const tasks = readTasks().filter(t => t.archived)
+  const page = parseInt(req.query.page) || 1
+  const limit = parseInt(req.query.limit) || 20
+  const start = (page - 1) * limit
+  const paged = tasks.slice(start, start + limit)
+  res.json({ tasks: paged, total: tasks.length, page, limit })
+})
+
+app.get('/api/tasks/archived/expired', (req, res) => {
+  const tasks = readTasks()
+  const sixMonthsAgo = new Date(Date.now() - 6 * 30 * 24 * 60 * 60 * 1000).toISOString()
+  const expired = tasks.filter(t => t.archived && t.archivedAt && t.archivedAt < sixMonthsAgo)
+  res.json({ tasks: expired, total: expired.length })
+})
+
+app.delete('/api/tasks/archived/bulk', (req, res) => {
+  const ids = req.body.ids || []
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: 'ids array required' })
+  }
+  let tasks = readTasks()
+  const before = tasks.length
+  tasks = tasks.filter(t => !ids.includes(t.id))
+  writeTasks(tasks)
+  res.json({ success: true, deleted: before - tasks.length })
 })
 
 // ========== Morning Plan APIs ==========
@@ -1199,6 +1254,7 @@ app.get('/api/stats', (req, res) => {
     overdueTasks,
     mainCount: tasks.filter(t => t.type === 'main' && t.status !== 'done').length,
     sideCount: tasks.filter(t => t.type === 'side' && t.status !== 'done').length,
+    archivedCount: tasks.filter(t => t.archived).length,
   })
 })
 

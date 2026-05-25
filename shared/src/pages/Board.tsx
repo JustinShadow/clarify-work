@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import type { Task } from '../types'
 import { taskApi, statsApi } from '../api'
 import { sortTasksByPriority, getTodayDateStr } from '../utils/priority'
@@ -7,20 +8,26 @@ import Layout from '../components/Layout'
 import KanbanBoard from '../components/KanbanBoard'
 import TaskModal from '../components/TaskModal'
 import StatsBar from '../components/StatsBar'
-import { Plus, Calendar } from 'lucide-react'
+import { Plus, Calendar, Archive } from 'lucide-react'
 
 export default function Board() {
+  const navigate = useNavigate()
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
+  const [archivedCount, setArchivedCount] = useState(0)
   const [stats, setStats] = useState<{ total: number; todo: number; inProgress: number; blocked: number; done: number; totalEstimatedMinutes: number; completedToday: number; overdueCount: number; overdueTasks: Task[]; mainCount: number; sideCount: number } | null>(null)
 
   const fetchTasks = useCallback(async (signal?: AbortSignal) => {
     try {
-      const [taskData, statsData] = await Promise.all([taskApi.list(), statsApi.get()])
+      const [taskRes, statsData] = await Promise.all([
+        taskApi.list(),
+        statsApi.get(),
+      ])
       if (signal?.aborted) return
-      setTasks(sortTasksByPriority(taskData))
+      setTasks(sortTasksByPriority(taskRes.tasks))
+      setArchivedCount(taskRes.archivedCount)
       setStats(statsData)
     } catch (err) {
       if (signal?.aborted) return
@@ -91,6 +98,18 @@ export default function Board() {
         </div>
 
         {stats && <StatsBar stats={stats} />}
+
+        {archivedCount > 0 && (
+          <div
+            onClick={() => navigate('/archived-tasks')}
+            className="flex items-center gap-2 px-4 py-2.5 bg-[#f1f5f9] border border-[#e2e8f0] rounded-xl cursor-pointer hover:bg-[#e2e8f0] transition-colors"
+          >
+            <Archive size={16} className="text-[#64748b]" />
+            <span className="text-sm text-[#64748b] font-medium">归档任务</span>
+            <span className="text-xs text-[#94a3b8]">({archivedCount})</span>
+            <span className="ml-auto text-[#94a3b8] text-sm">→</span>
+          </div>
+        )}
 
         {loading ? (
           <div className="text-center py-20 text-[#94a3b8]">

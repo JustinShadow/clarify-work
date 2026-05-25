@@ -6,6 +6,7 @@ import { getTodayDateStr } from '../utils/priority'
 import { MarkdownContent } from '../utils/markdown'
 import Layout from '../components/Layout'
 import LLMDialog from '../components/LLMDialog'
+import DatePickerDropdown from '../components/DatePickerDropdown'
 import { Sunrise, Sparkles, FileText, AlertTriangle } from 'lucide-react'
 
 function buildSummary(plan: MorningPlan): string {
@@ -118,18 +119,11 @@ export default function MorningPlanPage() {
             </div>
           </div>
           <div className="flex gap-3">
-            <select
-              value={selectedDate}
-              onChange={e => setSelectedDate(e.target.value)}
-              className="px-4 py-2.5 border border-[#e2e8f0] rounded-xl text-sm focus:ring-2 focus:ring-[#3b82f6] focus:border-[#3b82f6] outline-none bg-[#f8fafc]"
-            >
-              {!plans.some(p => p.date === today) && <option value={today}>{today} (今日)</option>}
-              {plans.map(p => (
-                <option key={p.date} value={p.date}>
-                  {p.date}{p.date === today ? ' (今日)' : ''}
-                </option>
-              ))}
-            </select>
+            <DatePickerDropdown
+              plans={plans}
+              selectedDate={selectedDate}
+              onSelect={setSelectedDate}
+            />
             <button
               onClick={() => setLlmOpen(true)}
               className="px-5 py-2.5 bg-[#1e3a5f] text-white rounded-xl hover:bg-[#1e4976] transition text-sm font-semibold flex items-center gap-2 shadow-md"

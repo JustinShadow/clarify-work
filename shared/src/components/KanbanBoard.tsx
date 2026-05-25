@@ -78,7 +78,13 @@ export default function KanbanBoard({ title, type, tasks, onEdit, onStatusChange
 
       <div className="grid grid-cols-3 gap-3">
         {COLUMNS.map(col => {
-          const colTasks = tasks.filter(t => t.status === col.status)
+          let colTasks = tasks.filter(t => t.status === col.status)
+          if (col.status === 'done') {
+            const sevenDaysAgo = new Date()
+            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+            const cutoff = sevenDaysAgo.toISOString().slice(0, 10)
+            colTasks = colTasks.filter(t => t.completedAt && t.completedAt >= cutoff)
+          }
           const blockedCount = colTasks.filter(t => t.blocked).length
           const activeCount = colTasks.filter(t => !t.blocked).length
           const sortedTasks = [...colTasks].sort((a, b) => {

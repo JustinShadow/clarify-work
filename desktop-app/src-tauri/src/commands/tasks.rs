@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 use tauri::State;
-use crate::models::{Task, TaskInput, Stats};
+use crate::models::{Task, TaskInput, Stats, ListTasksResponse, ArchivedTasksResponse};
 use crate::AppData;
 
 pub fn data_dir_from_state(state: &AppData) -> PathBuf {
@@ -50,9 +50,39 @@ fn now_iso() -> String {
     chrono::Utc::now().to_rfc3339()
 }
 
+fn auto_archive_tasks(state: &AppData) {
+    let mut tasks = read_tasks_from_state(state);
+    let now = now_iso();
+    let seven_days_ago = chrono::Utc::now() - chrono::Duration::days(7);
+    let seven_days_ago_str = seven_days_ago.to_rfc3339();
+    let mut changed = false;
+    for task in tasks.iter_mut() {
+        if task.status == "done" && !task.archived {
+            if let Some(ref completed_at) = task.completed_at {
+                if completed_at < &seven_days_ago_str {
+                    task.archived = true;
+                    task.archived_at = Some(now.clone());
+                    changed = true;
+                }
+            }
+        }
+    }
+    if changed {
+        write_tasks(state, &tasks);
+    }
+}
+
 #[tauri::command]
-pub fn list_tasks(state: State<AppData>) -> Vec<Task> {
-    read_tasks_from_state(&state)
+pub fn list_tasks(state: State<AppData>, include_archived: Option<bool>) -> ListTasksResponse {
+    auto_archive_tasks(&state);
+    let tasks = read_tasks_from_state(&state);
+    let archived_count = tasks.iter().filter(|t| t.archived).count();
+    let filtered = if include_archived.unwrap_or(false) {
+        tasks
+    } else {
+        tasks.into_iter().filter(|t| !t.archived).collect()
+    };
+    ListTasksResponse { tasks: filtered, archived_count }
 }
 
 #[tauri::command]
@@ -85,6 +115,8 @@ pub fn create_task(state: State<AppData>, task: TaskInput) -> Result<Task, Strin
             }
         }).collect(),
         result: task.result.unwrap_or_default(),
+        archived: task.archived.unwrap_or(false),
+        archived_at: task.archived_at.flatten(),
     };
     if !new_task.tags.is_empty() {
         sync_tags(&state, &new_task.tags);
@@ -136,6 +168,8 @@ pub fn update_task(state: State<AppData>, id: String, task: TaskInput) -> Result
             }
         }).collect()).unwrap_or_else(|| existing.events.clone()),
         result: task.result.unwrap_or_else(|| existing.result.clone()),
+        archived: task.archived.unwrap_or(existing.archived),
+        archived_at: if task.archived_at.is_some() { task.archived_at.flatten() } else { existing.archived_at.clone() },
     };
     if !updated.tags.is_empty() {
         sync_tags(&state, &updated.tags);
@@ -162,6 +196,7 @@ pub fn get_stats(state: State<AppData>) -> Stats {
     let overdue_tasks: Vec<Task> = tasks.iter().filter(|t| {
         t.status != "done" && t.deadline.as_deref().map(|d| *d < *today_str).unwrap_or(false)
     }).cloned().collect();
+    let archived_count = tasks.iter().filter(|t| t.archived).count();
 
     Stats {
         total: tasks.len(),
@@ -175,5 +210,44 @@ pub fn get_stats(state: State<AppData>) -> Stats {
         overdue_tasks,
         main_count: tasks.iter().filter(|t| t.task_type == "main" && t.status != "done").count(),
         side_count: tasks.iter().filter(|t| t.task_type == "side" && t.status != "done").count(),
+        archived_count,
     }
+}
+
+#[tauri::command]
+pub fn list_archived_tasks(state: State<AppData>, page: Option<usize>, limit: Option<usize>) -> ArchivedTasksResponse {
+    auto_archive_tasks(&state);
+    let tasks = read_tasks_from_state(&state);
+    let archived: Vec<Task> = tasks.into_iter().filter(|t| t.archived).collect();
+    let total = archived.len();
+    let p = page.unwrap_or(1);
+    let l = limit.unwrap_or(20);
+    let start = (p - 1) * l;
+    let paged: Vec<Task> = archived.into_iter().skip(start).take(l).collect();
+    ArchivedTasksResponse { tasks: paged, total, page: p, limit: l }
+}
+
+#[tauri::command]
+pub fn list_expired_tasks(state: State<AppData>) -> ArchivedTasksResponse {
+    let tasks = read_tasks_from_state(&state);
+    let six_months_ago = chrono::Utc::now() - chrono::Duration::days(180);
+    let six_months_ago_str = six_months_ago.to_rfc3339();
+    let expired: Vec<Task> = tasks.into_iter().filter(|t| {
+        t.archived && t.archived_at.as_deref().map(|a| a < &six_months_ago_str).unwrap_or(false)
+    }).collect();
+    let total = expired.len();
+    ArchivedTasksResponse { tasks: expired, total, page: 1, limit: total.max(1) }
+}
+
+#[tauri::command]
+pub fn bulk_delete_archived_tasks(state: State<AppData>, ids: Vec<String>) -> Result<serde_json::Value, String> {
+    if ids.is_empty() {
+        return Err("ids array required".to_string());
+    }
+    let tasks = read_tasks_from_state(&state);
+    let before = tasks.len();
+    let filtered: Vec<Task> = tasks.into_iter().filter(|t| !ids.contains(&t.id)).collect();
+    write_tasks(&state, &filtered);
+    let deleted = before - filtered.len();
+    Ok(serde_json::json!({ "success": true, "deleted": deleted }))
 }

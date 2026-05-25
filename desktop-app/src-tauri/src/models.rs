@@ -2,6 +2,22 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ListTasksResponse {
+    pub tasks: Vec<Task>,
+    pub archived_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArchivedTasksResponse {
+    pub tasks: Vec<Task>,
+    pub total: usize,
+    pub page: usize,
+    pub limit: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TaskEvent {
     pub date: String,
     pub content: String,
@@ -30,6 +46,10 @@ pub struct Task {
     pub events: Vec<TaskEvent>,
     #[serde(default)]
     pub result: String,
+    #[serde(default)]
+    pub archived: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub archived_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -49,6 +69,8 @@ pub struct TaskInput {
     pub tags: Option<Vec<String>>,
     pub events: Option<Vec<serde_json::Value>>,
     pub result: Option<String>,
+    pub archived: Option<bool>,
+    pub archived_at: Option<Option<String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -197,6 +219,7 @@ pub struct Stats {
     pub overdue_tasks: Vec<Task>,
     pub main_count: usize,
     pub side_count: usize,
+    pub archived_count: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

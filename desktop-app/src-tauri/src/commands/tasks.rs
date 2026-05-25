@@ -233,7 +233,7 @@ pub fn list_expired_tasks(state: State<AppData>) -> ArchivedTasksResponse {
     let six_months_ago = chrono::Utc::now() - chrono::Duration::days(180);
     let six_months_ago_str = six_months_ago.to_rfc3339();
     let expired: Vec<Task> = tasks.into_iter().filter(|t| {
-        t.archived && t.archived_at.as_deref().map(|a| a < &six_months_ago_str).unwrap_or(false)
+        t.archived && t.archived_at.as_deref().map(|a| *a < *six_months_ago_str).unwrap_or(false)
     }).collect();
     let total = expired.len();
     ArchivedTasksResponse { tasks: expired, total, page: 1, limit: total.max(1) }

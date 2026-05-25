@@ -32,13 +32,22 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 }
 
 const taskApi: TaskAPI = {
-  list: () => request<Task[]>('/tasks'),
+  list: (includeArchived = false) => {
+    const url = includeArchived ? '/tasks?includeArchived=true' : '/tasks'
+    return request<{ tasks: Task[]; archivedCount: number }>(url)
+  },
   create: (task: Partial<Task>) =>
     request<Task>('/tasks', { method: 'POST', body: JSON.stringify(task) }),
   update: (id: string, task: Partial<Task>) =>
     request<Task>(`/tasks/${id}`, { method: 'PUT', body: JSON.stringify(task) }),
   delete: (id: string) =>
     request<{ success: boolean }>(`/tasks/${id}`, { method: 'DELETE' }),
+  listArchived: (page = 1, limit = 20) =>
+    request<{ tasks: Task[]; total: number; page: number; limit: number }>(`/tasks/archived?page=${page}&limit=${limit}`),
+  listExpired: () =>
+    request<{ tasks: Task[]; total: number }>('/tasks/archived/expired'),
+  bulkDelete: (ids: string[]) =>
+    request<{ success: boolean; deleted: number }>('/tasks/archived/bulk', { method: 'DELETE', body: JSON.stringify({ ids }) }),
 }
 
 const tagsApi: TagsAPI = {
@@ -117,6 +126,7 @@ const statsApi: StatsAPI = {
       overdueTasks: Task[]
       mainCount: number
       sideCount: number
+      archivedCount: number
     }>('/stats'),
 }
 

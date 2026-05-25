@@ -19,10 +19,13 @@ import type {
 } from '../types'
 
 const taskApi: TaskAPI = {
-  list: () => invoke<Task[]>('list_tasks'),
+  list: (includeArchived = false) => invoke<{ tasks: Task[]; archivedCount: number }>('list_tasks', { includeArchived }),
   create: (task: Partial<Task>) => invoke<Task>('create_task', { task }),
   update: (id: string, task: Partial<Task>) => invoke<Task>('update_task', { id, task }),
   delete: (id: string) => invoke<{ success: boolean }>('delete_task', { id }),
+  listArchived: (page = 1, limit = 20) => invoke('list_archived_tasks', { page, limit }),
+  listExpired: () => invoke('list_expired_tasks'),
+  bulkDelete: (ids: string[]) => invoke('bulk_delete_archived_tasks', { ids }),
 }
 
 const tagsApi: TagsAPI = {
@@ -76,6 +79,7 @@ const statsApi: StatsAPI = {
       overdueTasks: Task[]
       mainCount: number
       sideCount: number
+      archivedCount: number
     }>('get_stats'),
 }
 

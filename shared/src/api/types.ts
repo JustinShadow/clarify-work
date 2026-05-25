@@ -1,10 +1,13 @@
 import type { Task, DailyReport, WeeklyReport, MonthlyReport, MorningPlan, LLMConfig } from '../types'
 
 export interface TaskAPI {
-  list: () => Promise<Task[]>
+  list: (includeArchived?: boolean) => Promise<{ tasks: Task[]; archivedCount: number }>
   create: (task: Partial<Task>) => Promise<Task>
   update: (id: string, task: Partial<Task>) => Promise<Task>
   delete: (id: string) => Promise<{ success: boolean }>
+  listArchived: (page?: number, limit?: number) => Promise<{ tasks: Task[]; total: number; page: number; limit: number }>
+  listExpired: () => Promise<{ tasks: Task[]; total: number }>
+  bulkDelete: (ids: string[]) => Promise<{ success: boolean; deleted: number }>
 }
 
 export interface TagsAPI {
@@ -90,6 +93,7 @@ export interface StatsAPI {
     overdueTasks: Task[]
     mainCount: number
     sideCount: number
+    archivedCount: number
   }>
 }
 

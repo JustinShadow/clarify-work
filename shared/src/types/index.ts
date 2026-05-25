@@ -25,6 +25,8 @@ export interface Task {
   tags: string[]
   events: TaskEvent[]
   result: string
+  archived: boolean
+  archivedAt: string | null
 }
 
 export interface MorningPlan {

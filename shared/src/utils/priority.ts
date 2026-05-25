@@ -103,7 +103,7 @@ export function getTodayDateStr(): string {
   return formatDateStr(new Date())
 }
 
-function formatDateStr(d: Date): string {
+export function formatDateStr(d: Date): string {
   const y = d.getFullYear()
   const m = String(d.getMonth() + 1).padStart(2, '0')
   const day = String(d.getDate()).padStart(2, '0')
@@ -126,4 +126,68 @@ export function getWeekRange(): { start: string; end: string } {
 
 export function getCurrentMonth(): string {
   return new Date().toISOString().slice(0, 7)
+}
+
+export function getISOWeek(dateStr: string): number {
+  const d = new Date(dateStr)
+  d.setHours(0, 0, 0, 0)
+  d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7))
+  const yearStart = new Date(d.getFullYear(), 0, 4)
+  return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + ((yearStart.getDay() + 6) % 7) + 1) / 7)
+}
+
+export function getISOWeekYear(dateStr: string): number {
+  const d = new Date(dateStr)
+  d.setHours(0, 0, 0, 0)
+  d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7))
+  return d.getFullYear()
+}
+
+export function getWeekStartDate(dateStr: string): string {
+  const d = new Date(dateStr)
+  const day = d.getDay()
+  const mondayOffset = day === 0 ? -6 : 1 - day
+  d.setDate(d.getDate() + mondayOffset)
+  return formatDateStr(d)
+}
+
+export function getWeekEndDate(dateStr: string): string {
+  const start = getWeekStartDate(dateStr)
+  const d = new Date(start)
+  d.setDate(d.getDate() + 6)
+  return formatDateStr(d)
+}
+
+export function getMonthKey(dateStr: string): string {
+  return dateStr.slice(0, 7)
+}
+
+export function getYearKey(dateStr: string): string {
+  return dateStr.slice(0, 4)
+}
+
+export function getMonthLabel(monthKey: string): string {
+  const [y, m] = monthKey.split('-')
+  return `${y}年${parseInt(m)}月`
+}
+
+export function formatDateShort(dateStr: string): string {
+  const d = new Date(dateStr)
+  return `${d.getMonth() + 1}月${d.getDate()}日`
+}
+
+export function isThisWeek(dateStr: string): boolean {
+  const now = new Date()
+  const today = formatDateStr(now)
+  const weekStart = getWeekStartDate(today)
+  const weekEnd = getWeekEndDate(today)
+  return dateStr >= weekStart && dateStr <= weekEnd
+}
+
+export function isThisMonth(monthKey: string): boolean {
+  return monthKey === getMonthKey(getTodayDateStr())
+}
+
+export function isThisYear(yearKey: string): boolean {
+  return yearKey === getYearKey(getTodayDateStr())
 }

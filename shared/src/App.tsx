@@ -5,12 +5,14 @@ import DailyReports from './pages/DailyReports'
 import WeeklyReports from './pages/WeeklyReports'
 import MonthlyReports from './pages/MonthlyReports'
 import Settings from './pages/Settings'
+import ArchivedTasks from './pages/ArchivedTasks'
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Board />} />
+        <Route path="/archived-tasks" element={<ArchivedTasks />} />
         <Route path="/plan" element={<MorningPlan />} />
         <Route path="/daily" element={<DailyReports />} />
         <Route path="/weekly" element={<WeeklyReports />} />

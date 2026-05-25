@@ -1,8 +1,9 @@
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Sunrise, FileText, Calendar, CalendarDays, SettingsIcon } from 'lucide-react'
+import { LayoutDashboard, Sunrise, FileText, Calendar, CalendarDays, SettingsIcon, Archive } from 'lucide-react'
 
 const navItems = [
   { path: '/', label: '看板', icon: LayoutDashboard },
+  { path: '/archived-tasks', label: '归档', icon: Archive },
   { path: '/plan', label: '晨间规划', icon: Sunrise },
   { path: '/daily', label: '日报', icon: FileText },
   { path: '/weekly', label: '周报', icon: Calendar },

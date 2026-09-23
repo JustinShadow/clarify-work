@@ -87,9 +87,15 @@ export default function KanbanBoard({ title, type, tasks, onEdit, onStatusChange
           }
           const blockedCount = colTasks.filter(t => t.blocked).length
           const activeCount = colTasks.filter(t => !t.blocked).length
+          const priorityOrder: Record<string, number> = { P0: 0, P1: 1, P2: 2, P3: 3 }
           const sortedTasks = [...colTasks].sort((a, b) => {
             if (a.blocked !== b.blocked) return a.blocked ? 1 : -1
-            return 0
+            if (a.deadline !== b.deadline) {
+              if (!a.deadline) return 1
+              if (!b.deadline) return -1
+              return a.deadline < b.deadline ? -1 : 1
+            }
+            return priorityOrder[a.priority] - priorityOrder[b.priority]
           })
           
           return (
